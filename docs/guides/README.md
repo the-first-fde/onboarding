@@ -24,6 +24,7 @@
 | 실제 에이전트 실행 범위 확인 | [Agent](agent-guide.md), [워크플로우](workflow-guide.md) | 가상 결과와 실제 외부 동작 구분 |
 | 테스트나 CI에서 실패 | [테스트](testing-guide.md), [품질](quality-guide.md), [문제 해결](troubleshooting.md) | 첫 실패 단계와 정확한 테스트 이름 |
 | 비밀 노출 또는 이상한 외부 도구 요청 | [보안](security-guide.md) | 값 없이 비공개 보고 |
+| Notion에서 Issue·Project 진행 상태 보기 | [GitHub ↔ Notion 연동](collaboration-integration-guide.md) | dry-run 결과와 활성화 여부 |
 | 병합 전에 확인할 사항 | [리뷰](review-guide.md), [체크리스트](review-checklist.md) | 현재 변경 버전의 증거와 사람 승인 |
 
 별도 언급이 없으면 터미널의 현재 위치는 저장소 루트다. Python 블록은 임시 파일 또는 표준입력으로 실행하며 레포에 넣을 필요가 없다. Git·GitHub·Claude 외부 동작을 설명하는 **절차 예시**는 권한과 승인 전에는 읽기만 한다. 고객사 자료 없이 실행하는 모든 실습은 기술 예제다. 실습별 실제 실행 여부는 [Handbook 감사 보고](../handbook-audit.md)에 있다.

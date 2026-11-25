@@ -17,6 +17,10 @@ git status --short --branch
 
 개인 설정·캐시·실행 로그·환경 파일 등 공유 가치가 없는 파일은 경로를 좁혀 ignore에 추가하고, 팀 설정·lock·검토한 가상 데이터는 유지한다. `*.json` 같이 모든 공유 파일까지 숨기는 패턴은 피한다. 승인된 의존성 감사가 외부 취약점 DB를 조회할 때는 패키지명·버전 공개 범위를 확인하고 소스·고객 데이터·비밀은 제공하지 않는다.
 
+## Public 저장소의 협업 자동화
+
+저장소는 Public이므로 외부인도 Issue를 만들어 workflow를 실행시킬 수 있다. [Notion 동기화](collaboration-integration-guide.md)는 main 브랜치 코드만 실행하고, 허용 목록에 있는 작성자의 Issue만 쓰고, 기본 비활성이다. Issue 제목·본문은 셸 명령이나 링크로 쓰지 않는다. 공개 실행 로그에는 Issue 번호와 결과 코드만 남긴다. GitHub App은 읽기 권한만, Notion Integration은 대상 DB 하나에만 연결한다. Notion 메모는 GitHub로 보내지 않는다. Secret은 main 브랜치 전용 Environment에만 둔다. 공개 로그에 남는 것은 Issue 번호, 결과 코드, 오류 유형, Notion 속성 이름, orphan·건너뛴 Issue 번호다. 건너뛴 번호로 허용 목록 규모를 짐작할 수는 있지만, login은 남지 않는다.
+
 ## 유출을 발견했을 때
 
 1. 결과나 값을 복사하지 않고 팀 리더에게 비공개로 즉시 알린다. 의심 시각, 경로, 접근 범위와 임시 차단 여부를 공유한다.

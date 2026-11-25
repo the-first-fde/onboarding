@@ -44,12 +44,14 @@ convention = "google"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# 협업 자동화(scripts/collaboration)를 HR 런타임 패키지와 분리한 채 import한다.
+pythonpath = ["scripts"]
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
 addopts = "--strict-markers"
 
 [tool.coverage.run]
-source = ["hr_onboarding"]
+source = ["hr_onboarding"]  # 협업 코드: pytest tests/collaboration --cov=collaboration
 relative_files = true
 branch = true
 
@@ -57,6 +59,7 @@ branch = true
 show_missing = true
 
 [tool.pyright]
-include = ["src"]
+include = ["src", "scripts/collaboration"]
+extraPaths = ["scripts"]
 pythonVersion = "3.12"
 typeCheckingMode = "standard"

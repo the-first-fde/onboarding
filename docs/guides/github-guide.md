@@ -30,4 +30,6 @@ Issue는 문제·결정을 추적하는 카드, Label은 유형이나 위험을 
 - [ ] Issue·Label·Milestone·Projects·PR·Review의 관계를 설명한다.
 - [ ] 팀 결정이 필요한 문제를 양식에 적고 등록 전 확인한다.
 
+Issue와 Project 상태는 Notion에도 한 방향으로 복사할 수 있다. 기준은 계속 GitHub이며 설정·운영은 [GitHub ↔ Notion 연동 가이드](collaboration-integration-guide.md)를 따른다.
+
 [GitHub Issues 공식 문서](https://docs.github.com/en/issues/tracking-your-work-with-issues/learning-about-issues/about-issues) · [보호 브랜치 적용 범위](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)

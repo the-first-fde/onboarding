@@ -18,6 +18,8 @@ macOS/Linux/WSL2에서 루트에서 실행한다. 앞의 공개 예시 값은 �
 2. 권한 있는 관리자가 프로젝트 키와 Secret을 승인된 채널에서 등록한다. 워크플로는 필요한 **step**에만 `vars` 또는 `secrets` 참조를 전달한다. 현재 예시는 [CI YAML](../../.github/workflows/ci.yml)에서 변수 이름과 주입 위치로 확인한다. Sonar 활성화 순서는 [품질 가이드](quality-guide.md)에 있다.
 3. 값은 출력하지 않고 승인 상태·변수 이름·해당 실행의 결과만 검토한다. 누락 시 이름과 단계만 공유한다. 실제 Secret 등록은 이 실습에서 미실행이다.
 
+협업 동기화용 Secret(`NOTION_SYNC_TOKEN`, `PROJECT_APP_PRIVATE_KEY`)과 Variable 이름은 [GitHub ↔ Notion 연동 가이드](collaboration-integration-guide.md) 9·10절에 있다. HR 업무용 인증과 섞지 않는다.
+
 **좋은 예**는 mock 값과 필요한 변수 이름만 공유한다. **피할 예**는 실제 값이 든 .env를 복제하거나 PR 로그 확인을 위해 값을 출력하는 것이다. Git에는 실제 환경 변수 값과 비밀을 올리지 않는다. 후속 실사용은 개인 보안 저장소나 운영체제 환경을 사용하고 AI에게 값을 주지 않는다.
 
 **Claude Code 연습** — “.env.example과 config.py, CI YAML만 읽고 변수 이름·옵션·사용 단계와 실패 시 확인할 항목을 알려줘. 실행 전에 계획을 보여줘.” 사람이 접근 파일 목록과 로컬 mock 출력을 검토한다. 새 인증이나 공유 경계를 결정해야 하면 Issue 초안을 제안하게 한다.

@@ -64,6 +64,7 @@ LangGraph는 무엇을 언제 실행할지 관리하고, SDK는 그 단계에서
 | [tests/](tests/README.md) · [fixtures/](fixtures/README.md) | 기술 검증과 향후 승인된 가상 시험 자료 |
 | [scripts/](scripts/README.md) · [docs/](docs/README.md) | 설치·진단·검증, 업무 명세와 설계 근거 |
 | [.claude/](.claude/README.md) · [.github/](.github/README.md) | AI 개발 환경, GitHub 협업 및 CI |
+| [scripts/collaboration/](scripts/collaboration/README.md) | HR 런타임과 분리된 팀 협업 자동화: GitHub Issues·Projects → Notion 단방향 동기화. [운영 가이드](docs/guides/collaboration-integration-guide.md) |
 
 [pyproject.toml](pyproject.toml)은 Python 버전과 도구 설정, [uv.lock](uv.lock)은 설치 버전을 고정한다. `schemas/`, `services/`, `storage/`, `scheduler/`는 현재 없다. 실제 책임과 요구가 합의되면 배치를 결정한다.
 
