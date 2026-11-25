@@ -1,0 +1,3 @@
+title = "The First: official default secret detection"
+[extend]
+useDefault = true
