@@ -1,0 +1,91 @@
+# GitHub Issues·Projects → Notion 단방향 동기화. 운영 가이드: docs/guides/collaboration-integration-guide.md
+# 이 workflow는 이벤트·권한·인증 주입·스크립트 실행만 담당한다. 로직은 scripts/collaboration에 있다.
+name: Notion Sync
+on:
+  issues:
+    types:
+      [opened, edited, closed, reopened, assigned, unassigned, labeled, unlabeled, milestoned, demilestoned]
+  schedule:
+    # Project에서만 바뀐 Status·Priority 반영과 누락 이벤트 복구. 정확한 실행 시각은 보장되지 않는다.
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: '동기화할 Issue 번호(비우면 전체 동기화)'
+        type: string
+        required: false
+        default: ''
+      dry_run:
+        description: 'Notion에 쓰지 않고 변경 예정만 확인'
+        type: boolean
+        required: false
+        default: true
+permissions:
+  contents: read
+concurrency:
+  # 실행 중인 동기화는 취소하지 않는다. 대기 중 실행은 교체될 수 있으며 예약 전체 동기화가 복구한다.
+  group: notion-sync-${{ github.repository }}
+  cancel-in-progress: false
+jobs:
+  sync:
+    # 기본 브랜치 코드만 실행한다. 비활성 상태에서는 수동 실행(dry-run 용도)만 허용한다.
+    if: >-
+      github.repository == 'the-first-fde/onboarding'
+      && github.ref == 'refs/heads/main'
+      && (vars.NOTION_SYNC_ENABLED == 'true' || github.event_name == 'workflow_dispatch')
+    # Secret은 main 브랜치로 제한한 Environment에 둔다. 다른 브랜치 workflow는 Secret을 받지 못한다.
+    environment: notion-sync
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          version: '0.11.8'
+          python-version: '3.12'
+          enable-cache: false
+      - name: Check required configuration (names only)
+        env:
+          PROJECT_APP_CLIENT_ID: ${{ vars.PROJECT_APP_CLIENT_ID }}
+          HAS_APP_KEY: ${{ secrets.PROJECT_APP_PRIVATE_KEY != '' }}
+          HAS_NOTION_TOKEN: ${{ secrets.NOTION_SYNC_TOKEN != '' }}
+        run: |
+          missing=()
+          [ -n "$PROJECT_APP_CLIENT_ID" ] || missing+=(PROJECT_APP_CLIENT_ID)
+          [ "$HAS_APP_KEY" = "true" ] || missing+=(PROJECT_APP_PRIVATE_KEY)
+          [ "$HAS_NOTION_TOKEN" = "true" ] || missing+=(NOTION_SYNC_TOKEN)
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "Configuration FAIL: missing ${missing[*]}"
+            exit 1
+          fi
+          echo "Required configuration present; values hidden"
+      - name: Create read-only GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.PROJECT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PROJECT_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: onboarding
+          permission-issues: read
+          permission-organization-projects: read
+      - name: Sync to Notion
+        env:
+          PYTHONPATH: scripts
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          NOTION_SYNC_TOKEN: ${{ secrets.NOTION_SYNC_TOKEN }}
+          NOTION_DATA_SOURCE_ID: ${{ vars.NOTION_DATA_SOURCE_ID }}
+          NOTION_SYNC_ENABLED: ${{ vars.NOTION_SYNC_ENABLED }}
+          NOTION_SYNC_ALLOWED_ACTORS: ${{ vars.NOTION_SYNC_ALLOWED_ACTORS }}
+          PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
+          # Issue 제목·본문은 넘기지 않는다. 스크립트가 번호로 최신 데이터를 다시 조회한다.
+          ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          args=(--all)
+          if [ -n "$ISSUE_NUMBER" ]; then args=(--issue "$ISSUE_NUMBER"); fi
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          # 표준 라이브러리만 쓰므로 프로젝트 의존성을 설치하지 않는다(Secret이 있는 프로세스의 공급망 노출 축소).
+          uv run --no-project python -m collaboration.notion_sync "${args[@]}"

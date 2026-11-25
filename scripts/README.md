@@ -24,7 +24,7 @@
 
 ## 5. 파일 및 모듈별 역할
 
-[bootstrap.py](bootstrap.py)는 설치, [doctor.py](doctor.py)는 환경 진단, [verify.py](verify.py)는 공통 검사, [check_instructions.py](check_instructions.py)는 문서 검사다. [install_tools.py](install_tools.py)와 [scan_secrets.py](scan_secrets.py)는 Gitleaks 설치와 공유 파일 검사를 맡는다.
+[bootstrap.py](bootstrap.py)는 설치, [doctor.py](doctor.py)는 환경 진단, [verify.py](verify.py)는 공통 검사, [check_instructions.py](check_instructions.py)는 문서 검사다. [install_tools.py](install_tools.py)와 [scan_secrets.py](scan_secrets.py)는 Gitleaks 설치와 공유 파일 검사를 맡는다. [collaboration/](collaboration/README.md)은 GitHub → Notion 협업 동기화 스크립트이며 verify의 Ruff·Pyright·pytest·Gitleaks 대상이다. coverage는 [별도 명령](collaboration/README.md)으로 확인한다.
 
 ## 6. 입력 및 출력 데이터
 

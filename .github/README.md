@@ -24,7 +24,7 @@ Issue는 일의 단위, PR은 변경 검토 요청, Milestone은 여러 Issue의
 
 ## 5. 파일 및 모듈별 역할
 
-[ISSUE_TEMPLATE](ISSUE_TEMPLATE)과 [PR 양식](pull_request_template.md), [리뷰·마일스톤 양식](templates), [CI](workflows/ci.yml)가 실제 사용 파일이다.
+[ISSUE_TEMPLATE](ISSUE_TEMPLATE)과 [PR 양식](pull_request_template.md), [리뷰·마일스톤 양식](templates), [CI](workflows/ci.yml)가 실제 사용 파일이다. [Notion Sync](workflows/notion-sync.yml)는 CI와 분리된 협업 자동화로, Issue 이벤트·15분 예약·수동 실행에서 [동기화 스크립트](../scripts/collaboration/README.md)를 실행한다. 기본 비활성이며 설정은 [운영 가이드](../docs/guides/collaboration-integration-guide.md)를 따른다.
 
 ## 6. 입력 및 출력 데이터
 
