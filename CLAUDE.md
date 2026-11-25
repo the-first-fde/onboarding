@@ -7,6 +7,7 @@
 - 프론트엔드/FastAPI 없음. 샘플 수령 전 HR Schema/공통 State/업무 규칙/공통 업무 fixtures 확정 금지.
 - 확인된 사실과 잠정 가정은 [open questions](docs/open-questions.md)에 구분한다.
 - 실제 고객사 데이터와 실제 인증을 사용하지 않는다. 실제 MCP 쓰기는 금지한다.
+- 고객사 데이터팩(`FF_HR과제_데이터팩_*/`, gitignore)은 로컬 참조 전용이다. `00_읽는_순서.md`부터 읽고, 문서에는 경로·절 번호로만 인용한다. 원문을 commit/Issue/PR/fixture에 복사하지 않는다.
 - 실제 메일과 입사 확정은 사람이 수동 수행한다.
 
 ## 작업 방법

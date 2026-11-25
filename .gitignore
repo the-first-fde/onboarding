@@ -46,6 +46,8 @@ logs/
 *.log
 outputs/
 tmp/
+# 고객사 제공 가명·가공 데이터팩: 로컬 참조 전용
+FF_HR과제_데이터팩_*/
 data/raw/
 data/private/
 data/customer/
