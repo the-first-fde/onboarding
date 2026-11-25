@@ -19,10 +19,11 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import interrupt
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 HR_ROLE = "인사 담당자"
 LEADER_INPUT_NOTICE = "리더 제공 내용 포함, 출처 확인 필요"
+COMMENT_MAX_LENGTH = 500
 
 ArtifactType = Literal[
     "mail_1",
@@ -90,6 +91,14 @@ class ManualActionRequired(ReviewError):
     """자동 실행하지 않고 담당자가 직접 해야 하는 행위."""
 
 
+class AlreadyExecuted(ReviewError):
+    """이미 실행 완료된 항목의 중복 실행 시도."""
+
+
+class MismatchedDraft(ReviewError):
+    """다른 입사자·산출물 종류의 초안으로 기존 항목을 다시 올리려는 시도."""
+
+
 class TemplateRef(BaseModel):
     """원본 양식 위치(데이터팩 경로·절·버전)."""
 
@@ -140,11 +149,14 @@ class ComparisonSummary(BaseModel):
 
 
 class ReviewDecision(BaseModel):
-    """사람의 검토 결정(interrupt 재개 값)."""
+    """사람의 검토 결정(interrupt 재개 값).
+
+    comment에는 이름·연락처·처우를 쓰지 않고 수정할 칸과 이유만 적는다(계약 문서 규칙).
+    """
 
     action: DecisionAction
     reviewer_role: str = Field(min_length=1)
-    comment: str = ""
+    comment: str = Field(default="", max_length=COMMENT_MAX_LENGTH)
 
 
 class Feedback(BaseModel):
@@ -168,7 +180,9 @@ class HistoryEntry(BaseModel):
 
 
 class ReviewItem(BaseModel):
-    """검토 대기열의 항목."""
+    """검토 대기열의 항목. 불변이며 바꿀 때는 model_copy로 새 객체를 만든다."""
+
+    model_config = ConfigDict(frozen=True)
 
     item_id: str
     hire_ref: str
@@ -321,10 +335,14 @@ def resubmit(item: ReviewItem, draft: Draft, *, now: datetime | None = None) -> 
 
     Returns:
         새 버전으로 검토대기 상태가 된 항목. 승인완료이고 내용이 같으면 그대로 돌려준다.
+        실행 완료 기록은 지워 다시 대기열에 보이게 한다.
 
     Raises:
-        InvalidTransition: 다시 올릴 수 없는 상태일 때.
+        MismatchedDraft: 입사자 참조 키나 산출물 종류가 기존 항목과 다를 때.
+        InvalidTransition: 다시 올릴 수 없는 상태(검토대기·보류)일 때.
     """
+    if (draft.hire_ref, draft.artifact_type) != (item.hire_ref, item.artifact_type):
+        raise MismatchedDraft(f"{item.item_id}: 다른 항목의 초안")
     new_hash = content_hash(draft.content)
     if item.status is ReviewStatus.APPROVED and new_hash == item.approved_hash:
         return item
@@ -333,25 +351,24 @@ def resubmit(item: ReviewItem, draft: Draft, *, now: datetime | None = None) -> 
         update={
             "draft_version": item.draft_version + 1,
             "content_hash": new_hash,
+            "related_checklist_ids": list(draft.related_checklist_ids),
+            "template_ref": draft.template_ref,
             "comparison_summary": summarize_comparison(draft),
             "approved_hash": None,
             "approved_by": None,
             "approved_at": None,
+            "executed_at": None,
         }
     )
 
 
-def require_approved(item: ReviewItem, content: DraftContent, *, action: str) -> None:
-    """외부 시스템 등록·수정 전에 승인 여부를 확인하는 게이트.
-
-    Args:
-        item: 검토 항목.
-        content: 실제로 실행에 쓰려는 내용.
-        action: 실행하려는 행위 이름.
+def _check_approved(item: ReviewItem, content: DraftContent, action: str) -> None:
+    """저장된 항목 기준으로 실행 가능 여부를 확인한다.
 
     Raises:
         ManualActionRequired: 메일 발송·입사 확정 등 사람이 직접 해야 하는 행위일 때.
         NotApproved: 승인완료가 아니거나 승인 뒤 내용이 바뀌었을 때.
+        AlreadyExecuted: 이미 실행 완료된 항목일 때.
     """
     if action in MANUAL_ACTIONS:
         raise ManualActionRequired(f"{action}은 담당자가 직접 수행")
@@ -359,6 +376,8 @@ def require_approved(item: ReviewItem, content: DraftContent, *, action: str) ->
         raise NotApproved(f"{item.item_id}: {item.status.value}")
     if content_hash(content) != item.approved_hash:
         raise NotApproved(f"{item.item_id}: 승인 뒤 내용 변경")
+    if item.executed_at is not None:
+        raise AlreadyExecuted(f"{item.item_id}: 이미 실행됨")
 
 
 def mark_executed(item: ReviewItem, *, now: datetime | None = None) -> ReviewItem:
@@ -369,13 +388,15 @@ def mark_executed(item: ReviewItem, *, now: datetime | None = None) -> ReviewIte
         now: 실행 완료 시각.
 
     Returns:
-        executed_at이 기록된 항목.
+        executed_at이 기록된 항목. 이미 기록돼 있으면 그대로 돌려준다(멱등).
 
     Raises:
         NotApproved: 승인완료가 아닐 때.
     """
     if item.status is not ReviewStatus.APPROVED:
         raise NotApproved(f"{item.item_id}: {item.status.value}")
+    if item.executed_at is not None:
+        return item
     at = now or _now()
     entry = HistoryEntry(
         from_status=item.status, to_status=item.status, event="execute", actor_role="system", at=at
@@ -384,7 +405,11 @@ def mark_executed(item: ReviewItem, *, now: datetime | None = None) -> ReviewIte
 
 
 class ReviewQueue:
-    """메모리 검토 대기열. 영속화 방식은 팀 합의 전이라 테스트·데모 용도다."""
+    """메모리 검토 대기열과 실행 게이트.
+
+    항목은 이 대기열의 메서드로만 바뀐다. 게이트는 호출자가 넘긴 객체가 아니라
+    저장된 항목을 item_id로 찾아 판단한다. 영속화 방식은 팀 합의 전이라 테스트·데모 용도다.
+    """
 
     def __init__(self) -> None:
         """빈 대기열을 만든다."""
@@ -399,6 +424,10 @@ class ReviewQueue:
 
         Returns:
             대기열의 항목.
+
+        Raises:
+            InvalidTransition: 검토대기·보류 중인 항목에 다른 내용을 올릴 때
+                (PROVISIONAL: 거부. 버전 교체 여부는 팀 판단).
         """
         item_id = f"{draft.hire_ref}:{draft.artifact_type}"
         existing = self._items.get(item_id)
@@ -411,9 +440,65 @@ class ReviewQueue:
         self._items[item_id] = item
         return item
 
-    def save(self, item: ReviewItem) -> None:
-        """갱신된 항목을 저장한다."""
-        self._items[item.item_id] = item
+    def decide(
+        self, item_id: str, decision: ReviewDecision, *, now: datetime | None = None
+    ) -> ReviewItem:
+        """저장된 항목에 사람의 검토 결정을 반영한다.
+
+        Args:
+            item_id: 항목 ID.
+            decision: 검토 결정.
+            now: 기록 시각.
+
+        Returns:
+            결정이 반영된 항목.
+
+        Raises:
+            KeyError: 없는 항목일 때.
+            UnauthorizedReviewer: 권한 없는 역할의 결정일 때.
+            InvalidTransition: 현재 상태에서 할 수 없는 결정일 때.
+        """
+        item = apply_decision(self._items[item_id], decision, now=now)
+        self._items[item_id] = item
+        return item
+
+    def require_approved(self, item_id: str, content: DraftContent, *, action: str) -> None:
+        """외부 시스템 등록·수정 전에 승인 여부를 확인하는 게이트.
+
+        Args:
+            item_id: 항목 ID.
+            content: 실제로 실행에 쓰려는 내용.
+            action: 실행하려는 행위 이름.
+
+        Raises:
+            ManualActionRequired: 메일 발송·입사 확정 등 사람이 직접 해야 하는 행위일 때.
+            NotApproved: 없는 항목이거나, 승인완료가 아니거나, 승인 뒤 내용이 바뀌었을 때.
+            AlreadyExecuted: 이미 실행 완료된 항목일 때.
+        """
+        item = self._items.get(item_id)
+        if item is None:
+            if action in MANUAL_ACTIONS:
+                raise ManualActionRequired(f"{action}은 담당자가 직접 수행")
+            raise NotApproved(f"{item_id}: 검토 대기열에 없음")
+        _check_approved(item, content, action)
+
+    def mark_executed(self, item_id: str, *, now: datetime | None = None) -> ReviewItem:
+        """저장된 승인 항목의 실행 완료를 기록한다(멱등).
+
+        Args:
+            item_id: 항목 ID.
+            now: 실행 완료 시각.
+
+        Returns:
+            executed_at이 기록된 항목.
+
+        Raises:
+            KeyError: 없는 항목일 때.
+            NotApproved: 승인완료가 아닐 때.
+        """
+        item = mark_executed(self._items[item_id], now=now)
+        self._items[item_id] = item
+        return item
 
     def get(self, item_id: str) -> ReviewItem:
         """항목을 찾는다.
@@ -475,28 +560,37 @@ def review_request(item: ReviewItem) -> dict[str, Any]:
 def build_review_graph(
     checkpointer: BaseCheckpointSaver[Any],
     *,
+    queue: ReviewQueue,
     now: Callable[[], datetime] = _now,
 ) -> CompiledStateGraph[ReviewGraphState, None, ReviewGraphState, ReviewGraphState]:
     """초안 등록 → 사람 결정 대기 → 결과 반환 서브그래프를 만든다.
 
-    승인완료·수정필요면 끝내고, 보류·검토대기면 다시 사람 결정을 기다린다.
+    등록 직후와 결정 뒤 모두, 승인완료·수정필요면 끝내고 보류·검토대기면 사람 결정을 기다린다.
+    같은 내용으로 다시 요청하면 기존 결과를 바로 돌려준다.
+    항목은 queue에 저장되며, 외부 실행 전에는 같은 queue의 require_approved로 확인한다.
+
+    제약: queue는 메모리 대기열이다. 영속 checkpointer와 함께 쓰다 프로세스가 재시작되면
+    대기열이 비어 재개 시 KeyError가 난다. 영속화 방식은 팀 합의 전이다.
 
     Args:
         checkpointer: interrupt 재개에 필요한 체크포인터.
+        queue: 검토 대기열. 게이트와 같은 객체를 넘긴다.
         now: 기록 시각 함수.
 
     Returns:
         컴파일된 그래프.
     """
+    review_queue = queue
 
     def prepare(state: ReviewGraphState) -> dict[str, Any]:
         draft = Draft.model_validate(state["draft"])
-        return {"item": submit_for_review(draft, now=now()).model_dump(mode="json")}
+        return {"item": review_queue.submit(draft, now=now()).model_dump(mode="json")}
 
     def await_review(state: ReviewGraphState) -> dict[str, Any]:
-        item = ReviewItem.model_validate(_state_item(state))
+        item = review_queue.get(_state_item(state)["item_id"])
         decision = ReviewDecision.model_validate(interrupt(review_request(item)))
-        return {"item": apply_decision(item, decision, now=now()).model_dump(mode="json")}
+        updated = review_queue.decide(item.item_id, decision, now=now())
+        return {"item": updated.model_dump(mode="json")}
 
     def route(state: ReviewGraphState) -> str:
         status = ReviewStatus(_state_item(state)["status"])
@@ -508,6 +602,6 @@ def build_review_graph(
     builder.add_node("prepare", prepare)
     builder.add_node("await_review", await_review)
     builder.add_edge(START, "prepare")
-    builder.add_edge("prepare", "await_review")
+    builder.add_conditional_edges("prepare", route, ["await_review", END])
     builder.add_conditional_edges("await_review", route, ["await_review", END])
     return builder.compile(checkpointer=checkpointer)

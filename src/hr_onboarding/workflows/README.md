@@ -28,7 +28,7 @@
 
 현재 폴더에는 README와 지침이 있다. 실행 예제는 [smoke.py](../smoke.py)의 run_smoke다. 승인 후 이곳에 업무 노드와 그래프 조립 코드를 책임별로 둔다.
 
-- [review_approval.py](review_approval.py) (PROVISIONAL): 검토 항목 상태 전이, 원본 대비 차이 요약, 사람 결정 대기(`interrupt`) 서브그래프 `build_review_graph`, 외부 실행 전 게이트 `require_approved`. 규칙은 [잠정 계약](../../../docs/contracts/review-approval.md)을 따른다.
+- [review_approval.py](review_approval.py) (PROVISIONAL): 검토 항목 상태 전이, 원본 대비 차이 요약, 사람 결정 대기(`interrupt`) 서브그래프 `build_review_graph`, 검토 대기열과 외부 실행 전 게이트 `ReviewQueue.require_approved`. 규칙은 [잠정 계약](../../../docs/contracts/review-approval.md)을 따른다.
 
 ## 6. 입력 및 출력 데이터
 

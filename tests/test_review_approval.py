@@ -15,13 +15,16 @@ from pydantic import ValidationError
 
 from hr_onboarding.workflows.review_approval import (
     LEADER_INPUT_NOTICE,
+    AlreadyExecuted,
     DecisionAction,
     Draft,
     DraftContent,
     InvalidTransition,
     ManualActionRequired,
+    MismatchedDraft,
     NotApproved,
     ReviewDecision,
+    ReviewItem,
     ReviewQueue,
     ReviewStatus,
     TemplateRef,
@@ -30,8 +33,8 @@ from hr_onboarding.workflows.review_approval import (
     build_review_graph,
     content_hash,
     mark_executed,
-    require_approved,
     resubmit,
+    review_request,
     submit_for_review,
 )
 
@@ -40,6 +43,7 @@ SOURCE_TEXT = "안녕하세요, {입사자}님.\n첫 출근 일정을 안내드�
 DRAFT_BODY = (
     "안녕하세요, 가상입사자님.\n첫 출근 일정을 안내드립니다.\n준비물을 챙겨 주세요.\n감사합니다."
 )
+WRITE_ACTION = "register_notion_row"
 
 
 def make_draft(body: str = DRAFT_BODY, **overrides: Any) -> Draft:
@@ -74,10 +78,21 @@ def hr_decision(action: DecisionAction, comment: str = "") -> ReviewDecision:
     return ReviewDecision(action=action, reviewer_role="인사 담당자", comment=comment)
 
 
-def approved_item():
+def approved_item() -> ReviewItem:
     """승인완료 상태의 검토 항목을 만든다."""
     item = submit_for_review(make_draft(), now=FIXED_NOW)
     return apply_decision(item, hr_decision("approve"), now=FIXED_NOW)
+
+
+def approved_queue() -> tuple[ReviewQueue, str]:
+    """승인완료 항목 하나가 든 대기열을 만든다."""
+    queue = ReviewQueue()
+    item = queue.submit(make_draft(), now=FIXED_NOW)
+    queue.decide(item.item_id, hr_decision("approve"), now=FIXED_NOW)
+    return queue, item.item_id
+
+
+# 상태 전이
 
 
 def test_submit_moves_to_pending_with_comparison_summary() -> None:
@@ -104,6 +119,13 @@ def test_leader_input_is_flagged_for_source_check() -> None:
     item = submit_for_review(draft, now=FIXED_NOW)
 
     assert LEADER_INPUT_NOTICE in item.comparison_summary.notices
+    assert LEADER_INPUT_NOTICE in review_request(item)["suggestions"]
+
+
+def test_account_request_suggests_permission_scope_check() -> None:
+    item = submit_for_review(make_draft(artifact_type="account_request"), now=FIXED_NOW)
+
+    assert any("권한" in s for s in review_request(item)["suggestions"])
 
 
 def test_history_does_not_store_body_text() -> None:
@@ -125,6 +147,11 @@ def test_history_does_not_store_body_text() -> None:
 def test_invalid_draft_is_rejected(overrides: dict[str, Any]) -> None:
     with pytest.raises(ValidationError):
         make_draft(**overrides)
+
+
+def test_too_long_comment_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        hr_decision("request_changes", "가" * 501)
 
 
 def test_hr_approval_completes_item() -> None:
@@ -151,9 +178,22 @@ def test_request_changes_then_resubmit_returns_to_pending() -> None:
     assert item.status is ReviewStatus.CHANGES_REQUESTED
     assert item.feedback[-1].comment == "준비물 문구 수정"
 
-    item = resubmit(item, make_draft(body=DRAFT_BODY + "\n추가 안내"), now=FIXED_NOW)
+    new_draft = make_draft(
+        body=DRAFT_BODY + "\n추가 안내", related_checklist_ids=["ON-10", "ON-19"]
+    )
+    item = resubmit(item, new_draft, now=FIXED_NOW)
     assert item.status is ReviewStatus.PENDING
     assert item.draft_version == 2
+    assert item.related_checklist_ids == ["ON-10", "ON-19"]
+
+
+def test_resubmit_rejects_draft_for_other_item() -> None:
+    item = apply_decision(
+        submit_for_review(make_draft(), now=FIXED_NOW), hr_decision("request_changes")
+    )
+
+    with pytest.raises(MismatchedDraft):
+        resubmit(item, make_draft(hire_ref="H-TEST-02"), now=FIXED_NOW)
 
 
 def test_hold_then_release_returns_to_pending() -> None:
@@ -183,43 +223,79 @@ def test_changed_content_after_approval_needs_reapproval() -> None:
     assert item.approved_hash is None
 
 
-def test_gate_passes_only_for_approved_same_content() -> None:
+def test_same_content_after_approval_keeps_approval() -> None:
     item = approved_item()
 
-    require_approved(item, make_draft().content, action="register_notion_row")
+    assert resubmit(item, make_draft(), now=FIXED_NOW) == item
+
+
+def test_mark_executed_requires_approval_and_is_idempotent() -> None:
+    with pytest.raises(NotApproved):
+        mark_executed(submit_for_review(make_draft(), now=FIXED_NOW), now=FIXED_NOW)
+
+    once = mark_executed(approved_item(), now=FIXED_NOW)
+    assert mark_executed(once, now=FIXED_NOW) == once
+
+
+# 대기열과 실행 게이트
+
+
+def test_gate_passes_only_for_approved_same_content() -> None:
+    queue, item_id = approved_queue()
+
+    queue.require_approved(item_id, make_draft().content, action=WRITE_ACTION)
 
 
 def test_gate_blocks_unapproved_item() -> None:
-    item = submit_for_review(make_draft(), now=FIXED_NOW)
+    queue = ReviewQueue()
+    item = queue.submit(make_draft(), now=FIXED_NOW)
 
     with pytest.raises(NotApproved):
-        require_approved(item, make_draft().content, action="register_notion_row")
+        queue.require_approved(item.item_id, make_draft().content, action=WRITE_ACTION)
+
+
+def test_gate_blocks_unknown_item() -> None:
+    with pytest.raises(NotApproved):
+        ReviewQueue().require_approved(
+            "H-TEST-01:mail_3", make_draft().content, action=WRITE_ACTION
+        )
+
+
+def test_gate_ignores_forged_item_objects() -> None:
+    queue = ReviewQueue()
+    item = queue.submit(make_draft(), now=FIXED_NOW)
+    forged = approved_item()  # 대기열 밖에서 만든 승인 객체
+    assert forged.item_id == item.item_id
+
+    with pytest.raises(NotApproved):
+        queue.require_approved(item.item_id, make_draft().content, action=WRITE_ACTION)
 
 
 def test_gate_blocks_changed_content() -> None:
-    item = approved_item()
+    queue, item_id = approved_queue()
 
     with pytest.raises(NotApproved):
-        require_approved(
-            item, make_draft(body="몰래 바뀐 본문").content, action="register_notion_row"
+        queue.require_approved(
+            item_id, make_draft(body="몰래 바뀐 본문").content, action=WRITE_ACTION
         )
+
+
+def test_gate_blocks_already_executed_item() -> None:
+    queue, item_id = approved_queue()
+    queue.mark_executed(item_id, now=FIXED_NOW)
+
+    with pytest.raises(AlreadyExecuted):
+        queue.require_approved(item_id, make_draft().content, action=WRITE_ACTION)
 
 
 @pytest.mark.parametrize(
     "action", ["send_mail", "confirm_hire", "decide_hiring", "decide_regular_conversion"]
 )
 def test_manual_actions_are_never_automated(action: str) -> None:
-    item = approved_item()
+    queue, item_id = approved_queue()
 
     with pytest.raises(ManualActionRequired):
-        require_approved(item, make_draft().content, action=action)
-
-
-def test_mark_executed_requires_approval() -> None:
-    item = submit_for_review(make_draft(), now=FIXED_NOW)
-
-    with pytest.raises(NotApproved):
-        mark_executed(item, now=FIXED_NOW)
+        queue.require_approved(item_id, make_draft().content, action=action)
 
 
 def test_queue_removes_executed_items_and_dedupes() -> None:
@@ -229,15 +305,49 @@ def test_queue_removes_executed_items_and_dedupes() -> None:
     assert again.item_id == first.item_id
     assert len(queue.pending()) == 1
 
-    queue.save(apply_decision(first, hr_decision("approve"), now=FIXED_NOW))
+    queue.decide(first.item_id, hr_decision("approve"), now=FIXED_NOW)
     assert len(queue.pending()) == 1
 
-    queue.save(mark_executed(queue.get(first.item_id), now=FIXED_NOW))
+    queue.mark_executed(first.item_id, now=FIXED_NOW)
     assert queue.pending() == []
 
 
+def test_changed_content_after_execution_returns_to_queue() -> None:
+    queue, item_id = approved_queue()
+    queue.mark_executed(item_id, now=FIXED_NOW)
+
+    item = queue.submit(make_draft(body="실행 뒤 바뀐 본문"), now=FIXED_NOW)
+
+    assert item.status is ReviewStatus.PENDING
+    assert item.executed_at is None
+    assert [i.item_id for i in queue.pending()] == [item_id]
+
+
+@pytest.mark.parametrize("action", ["hold", None])
+def test_new_content_while_pending_or_on_hold_is_rejected(action: DecisionAction | None) -> None:
+    queue = ReviewQueue()
+    item = queue.submit(make_draft(), now=FIXED_NOW)
+    if action is not None:
+        queue.decide(item.item_id, hr_decision(action), now=FIXED_NOW)
+
+    with pytest.raises(InvalidTransition):
+        queue.submit(make_draft(body="검토 중에 바뀐 본문"), now=FIXED_NOW)
+
+
+# 사람 결정 대기 그래프
+
+
+def start_graph(queue: ReviewQueue, thread_id: str) -> tuple[Any, RunnableConfig]:
+    """그래프를 만들고 첫 interrupt까지 실행한다."""
+    graph = build_review_graph(MemorySaver(), queue=queue, now=lambda: FIXED_NOW)
+    config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
+    graph.invoke({"draft": make_draft().model_dump(mode="json")}, config)
+    return graph, config
+
+
 def test_graph_waits_for_human_then_approves() -> None:
-    graph = build_review_graph(MemorySaver(), now=lambda: FIXED_NOW)
+    queue = ReviewQueue()
+    graph = build_review_graph(MemorySaver(), queue=queue, now=lambda: FIXED_NOW)
     config: RunnableConfig = {"configurable": {"thread_id": "review-test-1"}}
 
     paused = graph.invoke({"draft": make_draft().model_dump(mode="json")}, config)
@@ -247,13 +357,12 @@ def test_graph_waits_for_human_then_approves() -> None:
 
     result = graph.invoke(Command(resume=hr_decision("approve").model_dump()), config)
     assert result["item"]["status"] == ReviewStatus.APPROVED.value
+    queue.require_approved(result["item"]["item_id"], make_draft().content, action=WRITE_ACTION)
 
 
 def test_graph_returns_feedback_on_request_changes() -> None:
-    graph = build_review_graph(MemorySaver(), now=lambda: FIXED_NOW)
-    config: RunnableConfig = {"configurable": {"thread_id": "review-test-2"}}
+    graph, config = start_graph(ReviewQueue(), "review-test-2")
 
-    graph.invoke({"draft": make_draft().model_dump(mode="json")}, config)
     result = graph.invoke(
         Command(resume=hr_decision("request_changes", "제목 수정").model_dump()), config
     )
@@ -263,10 +372,8 @@ def test_graph_returns_feedback_on_request_changes() -> None:
 
 
 def test_graph_hold_waits_again_until_release() -> None:
-    graph = build_review_graph(MemorySaver(), now=lambda: FIXED_NOW)
-    config: RunnableConfig = {"configurable": {"thread_id": "review-test-3"}}
+    graph, config = start_graph(ReviewQueue(), "review-test-3")
 
-    graph.invoke({"draft": make_draft().model_dump(mode="json")}, config)
     held = graph.invoke(Command(resume=hr_decision("hold").model_dump()), config)
     assert held["__interrupt__"][0].value["status"] == ReviewStatus.ON_HOLD.value
 
@@ -275,3 +382,38 @@ def test_graph_hold_waits_again_until_release() -> None:
 
     result = graph.invoke(Command(resume=hr_decision("approve").model_dump()), config)
     assert result["item"]["status"] == ReviewStatus.APPROVED.value
+
+
+def test_graph_rejects_non_hr_decision() -> None:
+    graph, config = start_graph(ReviewQueue(), "review-test-4")
+    leader = ReviewDecision(action="approve", reviewer_role="리더")
+
+    with pytest.raises(UnauthorizedReviewer):
+        graph.invoke(Command(resume=leader.model_dump()), config)
+
+
+def test_graph_rerun_with_same_approved_draft_ends_without_waiting() -> None:
+    queue, item_id = approved_queue()
+    graph = build_review_graph(MemorySaver(), queue=queue, now=lambda: FIXED_NOW)
+    config: RunnableConfig = {"configurable": {"thread_id": "review-test-6"}}
+
+    result = graph.invoke({"draft": make_draft().model_dump(mode="json")}, config)
+
+    assert "__interrupt__" not in result
+    assert result["item"]["status"] == ReviewStatus.APPROVED.value
+    queue.require_approved(item_id, make_draft().content, action=WRITE_ACTION)
+
+
+def test_stored_items_cannot_be_mutated_to_bypass_gate() -> None:
+    queue = ReviewQueue()
+    item = queue.submit(make_draft(), now=FIXED_NOW)
+
+    with pytest.raises(ValidationError):
+        queue.get(item.item_id).status = ReviewStatus.APPROVED  # type: ignore[misc]
+
+
+def test_graph_rejects_unknown_action() -> None:
+    graph, config = start_graph(ReviewQueue(), "review-test-5")
+
+    with pytest.raises(ValidationError):
+        graph.invoke(Command(resume={"action": "skip", "reviewer_role": "인사 담당자"}), config)

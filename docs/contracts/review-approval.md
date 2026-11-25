@@ -27,21 +27,22 @@
 
 | 구분 | 잠정 이름 | 의미/타입 후보 | 필수 여부/누락 처리 | 출처 | 민감도 | 상태 |
 |---|---|---|---|---|---|---|
-| 입력 | `request_review(draft)` | 초안을 검토 대기열에 올림. 승인 결과 또는 피드백을 돌려줌 | 필수 / 필드 누락 시 등록 거부 | 안내·준비 담당 합의(승인 지점에서 HITL 호출) | 낮음 | PROVISIONAL |
+| 입력 | `request_review(draft)` | 초안을 검토 대기열에 올림. 승인 결과 또는 피드백을 돌려줌. 구현: `build_review_graph(queue=...)` 서브그래프, 또는 `ReviewQueue.submit` | 필수 / 필드 누락 시 등록 거부 | 안내·준비 담당 합의(승인 지점에서 HITL 호출) | 낮음 | PROVISIONAL |
 | 입력 | `hire_ref` | `str`, 입사자 참조 키(이름·연락처 아님) | 필수 / 누락 시 거부 | 팀 식별자 규칙 미정 | 낮음(PII 금지) | NEEDS_CLARIFICATION |
 | 입력 | `artifact_type` | `Literal["mail_1".."mail_6", "intro_chat", "leader_checklist", "staff_request", "account_request", "onboarding_plan"]` | 필수 / 미등록 값 거부 | `06_입사_안내메일.md`, `08_첫주_캘린더_요청문구.md` 3절 | 낮음 | PROVISIONAL |
 | 입력 | `related_checklist_ids` | `list[str]`, `ON-xx` 형식 | 선택 / 형식 오류 시 거부 | `02_온보딩_체크리스트_양식.md` v3.2 | 낮음 | PROVISIONAL |
-| 입력 | `template_ref` | `{file: str, section: str, version: str}` 원본 양식 위치 | 필수 / 누락 시 차이 요약 「원본 없음」 표시 | 데이터팩 경로·절 | 낮음 | PROVISIONAL |
+| 입력 | `template_ref` | `{file: str, section: str, version: str}` 원본 양식 위치 | 필수 / 누락 시 거부 | 데이터팩 경로·절 | 낮음 | PROVISIONAL |
+| 입력 | `source_text` | `str \| None`, 비교할 원본 양식 원문(호출자가 전달, HITL은 데이터팩을 읽지 않음) | 선택 / 없으면 차이 요약에 「원본 없음」(`template_missing`) 표시 | 데이터팩 경로·절 | 낮음 | PROVISIONAL |
 | 입력 | `content` | 메일형 `{subject, to_role, cc_role, body}` / 그 외 `body` | 필수 / 빈 값 거부 | 안내·준비 담당과 형식 합의 필요 | 중간(본문에 PII 금지) | NEEDS_CLARIFICATION |
 | 입력 | `contains_leader_input` | `bool`, 리더 제공 내용(ON-34 합류 배경, ON-09 첫 주 목표) 포함 여부 | 선택 / 기본 `False` | `06_입사_안내메일.md` 챗 메시지 절 | 낮음 | PROVISIONAL |
-| 입력 | `decision` | 사람 응답 `{action: approve/request_changes/hold/release, reviewer_role, comment}` | 필수(interrupt 재개 값) | LangGraph `interrupt`/`Command(resume=...)` | 낮음 | PROVISIONAL |
+| 입력 | `decision` | 사람 응답 `{action: approve/request_changes/hold/release, reviewer_role, comment}`. `comment`는 500자 이내, 이름·연락처·처우 없이 수정할 칸과 이유만 적음 | 필수(interrupt 재개 값) / 형식 오류·초과 시 거부 | LangGraph `interrupt`/`Command(resume=...)` | 낮음 | PROVISIONAL |
 | 내부 | `ReviewItem` | `item_id, hire_ref, artifact_type, related_checklist_ids, template_ref, draft_version, content_hash, status, comparison_summary, reviewer_role, feedback[], approved_hash, approved_by, approved_at, executed_at, history[]` | — | 이 문서 | 낮음(PII 미저장) | PROVISIONAL |
 | 내부 | `status` | `초안생성 / 검토대기 / 수정필요 / 승인완료 / 보류` | — | 업무 분할 4번 | 낮음 | PROVISIONAL |
 | 출력 | `comparison_summary` | 원본 양식 대비 바뀐 칸·추가·삭제 줄 요약, 리더 제공 내용이면 「출처 확인 필요」 표시 | 필수 | 업무 분할 4번 | 낮음 | PROVISIONAL |
 | 출력 | `review_request` | 담당자에게 보여 줄 검토 요청(항목·차이 요약·후속 제안) | 검토대기 진입 시 | 업무 분할 4번 | 낮음 | PROVISIONAL |
-| 출력 | `require_approved(item_id, content)` | 외부 등록·수정 전 게이트. 승인완료이고 해시가 같을 때만 통과, 아니면 `NotApproved` | 모든 MCP 쓰기 전 필수 | 루트 CLAUDE.md(실제 MCP 쓰기 금지) | 낮음 | PROVISIONAL |
+| 출력 | `ReviewQueue.require_approved(item_id, content, action)` | 외부 등록·수정 전 게이트. 대기열에 저장된 항목만 item_id로 찾아 판단(호출자가 넘긴 객체는 믿지 않음). 승인완료·같은 해시·미실행일 때만 통과. 없는 항목·미승인·내용 변경은 `NotApproved`, 실행 완료 항목은 `AlreadyExecuted` | 모든 MCP 쓰기 전 필수 | 루트 CLAUDE.md(실제 MCP 쓰기 금지) | 낮음 | PROVISIONAL |
 | 출력 | `ManualActionRequired` | 메일 발송·입사 확정·합격/불합격·정규 전환 결정은 승인돼도 자동 실행하지 않고 사람에게 넘김 | 항상 | `06_입사_안내메일.md` 머리말, `02_조직도.md` 3절 | 낮음 | PROVISIONAL |
-| 출력 | `executed_at` | 승인 뒤 실행(수동 포함) 완료 시각. 기록되면 검토 대기열에서 제거 | 실행 후 | 업무 분할 4번 | 낮음 | PROVISIONAL |
+| 출력 | `executed_at` | 승인 뒤 실행(수동 포함) 완료 시각. 기록되면 검토 대기열에서 제거. 기록은 멱등이고, 이후 내용이 바뀌어 다시 올라오면 지우고 대기열에 되돌림 | 실행 후 | 업무 분할 4번 | 낮음 | PROVISIONAL |
 
 ## 업무 규칙 후보와 질문
 
@@ -51,10 +52,16 @@
   - 계정 요청(3-3) 검토 때 「신청 권한이 직무에 맞고 넘치지 않는지」를 검토 요청 문구에 넣는다.
 - 오류·재시도·중복·시간대·승인·수동 전환:
   - 같은 `item_id`·같은 해시 재등록은 기존 항목을 돌려준다(중복 생성 없음).
+  - 검토대기·보류 중인 항목에 다른 내용을 올리면 거부한다(`InvalidTransition`). PROVISIONAL — 버전 교체 허용 여부는 팀 판단 필요.
+  - 다른 입사자·산출물 종류의 초안으로 기존 항목을 다시 올리면 거부한다(`MismatchedDraft`).
+  - 같은 내용으로 검토를 다시 요청하면 그래프는 사람을 다시 기다리지 않고 기존 결과(승인완료·수정필요)를 바로 돌려준다.
+  - `ReviewItem`은 불변 객체다. 대기열 밖에서 상태를 바꿔 게이트를 통과할 수 없다.
+  - 그래프는 게이트와 같은 `ReviewQueue`를 반드시 받는다. 대기열은 메모리 전용이라 프로세스 재시작 뒤 재개는 지원하지 않는다(영속화는 팀 판단).
+  - `reviewer_role`은 호출자가 적는 역할 문자열이다. 실제 사용자 인증은 이 서브에이전트 범위 밖이며 팀 판단이 필요하다.
   - 시각은 KST, 날짜 `2026-11-23`·시간 `14:00` 형식(`00_공통/01_기준표.md`).
   - 승인 대기 중 자동 재시도·자동 승인은 없다.
 - 외부 시스템과 최소 권한(현재 MCP 쓰기 금지): HITL은 외부 시스템을 직접 호출하지 않는다. 다른 담당자의 MCP mock 쓰기 앞에 `require_approved`를 둔다.
-- 보존/삭제/마스킹/로그 정책: `ReviewItem`과 `history`에 이름·연락처·주소·처우·주민번호·인증정보를 넣지 않는다(`00_공통/05_AI_사용_보안_가이드.md`). 로그에는 `item_id`·상태·해시만 남긴다. 보존 기간은 NEEDS_CLARIFICATION.
+- 보존/삭제/마스킹/로그 정책: `ReviewItem`과 `history`에 이름·연락처·주소·처우·주민번호·인증정보를 넣지 않는다(`00_공통/05_AI_사용_보안_가이드.md`). 검토 의견 `comment`는 자유 텍스트라 코드로 막을 수 없으므로, 작성 규칙(수정할 칸과 이유만)과 길이 제한(500자)으로 관리한다. 로그에는 `item_id`·상태·해시만 남긴다. 보존 기간은 NEEDS_CLARIFICATION.
 - 다른 담당자와 충돌/공통화가 필요한 사항:
   - 안내·준비 담당: `artifact_type` 목록, `content` 형식, 승인 지점별 `request_review` 호출 위치, 외부 쓰기 mock 앞 게이트 적용.
   - 계획·진행 담당: 온보딩 계획 검토 단위, `executed_at` 전달 방식(진행현황은 「진행 중」으로 받음), 반송된 요청을 새 수정 요청으로 받는 형식.
