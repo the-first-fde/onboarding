@@ -28,6 +28,8 @@
 
 현재 폴더에는 README와 지침이 있다. 실행 예제는 [smoke.py](../smoke.py)의 run_smoke다. 승인 후 이곳에 업무 노드와 그래프 조립 코드를 책임별로 둔다.
 
+- [review_approval.py](review_approval.py) (PROVISIONAL): 검토 항목 상태 전이, 원본 대비 차이 요약, 사람 결정 대기(`interrupt`) 서브그래프 `build_review_graph`, 외부 실행 전 게이트 `require_approved`. 규칙은 [잠정 계약](../../../docs/contracts/review-approval.md)을 따른다.
+
 ## 6. 입력 및 출력 데이터
 
 기술 예제는 카운터 0을 받아 1을 반환한다. 업무 입력은 승인된 계획 근거와 산출물이며, 출력은 다음 단계가 소비하는 처리 결과다. 실제 필드, 상태와 오류 규칙은 잠정 계약에서 확인한다.
@@ -78,9 +80,10 @@ assert graph_result() == 1
 
 ```bash
 uv run --locked pytest -q tests/test_smoke.py::test_graph_runs_without_network
+uv run --locked pytest -q tests/test_review_approval.py
 ```
 
-카운터 검증 한 건이 통과해야 한다. 실패하면 노드 추가·엣지 순서와 반환값을 smoke.py에서 확인한다. 고객사 자료가 필요한 결과는 승인된 비식별 근거와 계약이 확보된 뒤 별도 인수 조건으로 검증한다.
+카운터 검증 한 건과 검토·승인 테스트가 통과해야 한다. 실패하면 노드 추가·엣지 순서와 반환값을 smoke.py에서 확인한다. 고객사 자료가 필요한 결과는 승인된 비식별 근거와 계약이 확보된 뒤 별도 인수 조건으로 검증한다.
 
 ## 12. 개발 완료 기준
 

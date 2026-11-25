@@ -26,7 +26,7 @@ Markdown은 텍스트 문서 형식이다. 런타임 프롬프트는 에이전�
 
 ## 5. 파일 및 모듈별 역할
 
-[template.md](template.md)는 작성 양식이다. 구체적인 역할 문서는 각 Spec과 데이터 근거 확인 후 이곳에 추가한다.
+[template.md](template.md)는 작성 양식이다. 구체적인 역할 문서는 각 Spec과 데이터 근거 확인 후 이곳에 추가한다. [review-approval.md](review-approval.md)는 검토·승인(HITL) 업무 정의(PROVISIONAL)다.
 
 ## 6. 입력 및 출력 데이터
 

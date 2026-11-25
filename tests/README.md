@@ -26,7 +26,7 @@ pytest는 test_로 시작하는 테스트를 찾는다. assert는 실제 결과�
 
 ## 5. 파일 및 모듈별 역할
 
-[test_smoke.py](test_smoke.py)는 그래프·SDK·Markdown·MCP 가상 응답을 검사한다. [test_hooks.py](test_hooks.py)는 hook 판단을 검증한다. [conftest.py](conftest.py)는 테스트 중 소켓 연결을 차단한다. [collaboration/](collaboration)은 GitHub → Notion 동기화를 transport fake와 in-memory fake로 검증한다.
+[test_smoke.py](test_smoke.py)는 그래프·SDK·Markdown·MCP 가상 응답을 검사한다. [test_hooks.py](test_hooks.py)는 hook 판단을 검증한다. [conftest.py](conftest.py)는 테스트 중 소켓 연결을 차단한다. [test_review_approval.py](test_review_approval.py)는 검토·승인(HITL) 상태 전이, 승인 게이트, 사람 결정 대기 그래프를 테스트 안에서 만든 가상 초안으로 검증한다. [collaboration/](collaboration)은 GitHub → Notion 동기화를 transport fake와 in-memory fake로 검증한다.
 
 ## 6. 입력 및 출력 데이터
 
