@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -7,6 +8,7 @@ from hr_onboarding.workflows.preparation_checklist import (
     ChecklistTemplate,
     ChecklistTemplateItem,
     NewHire,
+    PreparationRequest,
 )
 
 
@@ -60,3 +62,26 @@ def template() -> ChecklistTemplate:
             for index, (owner, rule, condition) in enumerate(rows, 1)
         ),
     )
+
+
+@pytest.fixture
+def today() -> date:
+    return date(2027, 2, 22)
+
+
+@pytest.fixture
+def request_complete(hire_experienced_laptop: NewHire) -> PreparationRequest:
+    hire = hire_experienced_laptop
+    return PreparationRequest(
+        hire.hire_id, hire.start_date, hire.career_type, hire.laptop_provided, "VL-001", "VB-001"
+    )
+
+
+@pytest.fixture
+def request_without_buddy(request_complete: PreparationRequest) -> PreparationRequest:
+    return replace(request_complete, buddy_ref=None)
+
+
+@pytest.fixture
+def request_laptop_undecided(request_complete: PreparationRequest) -> PreparationRequest:
+    return replace(request_complete, laptop_provided=None)

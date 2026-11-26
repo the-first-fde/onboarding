@@ -3,7 +3,7 @@
 from collections.abc import Mapping
 from types import MappingProxyType
 
-from .models import HoldReason, Role, SectionKind
+from .models import HoldReason, InputHoldReason, Role, SectionKind
 
 # PROVISIONAL: Spec P8 대상 역할과 순서.
 TARGET_ROLES = (Role.LEADER, Role.GENERAL_AFFAIRS, Role.BUDDY)
@@ -23,4 +23,21 @@ HOLD_REASON_LABELS: Mapping[HoldReason, str] = MappingProxyType(
         HoldReason.LAPTOP_UNDECIDED: "노트북 지급 여부 미정",
         HoldReason.UNSUPPORTED_RULE: "해석할 수 없는 기준일",
     }
+)
+
+# PROVISIONAL: 그래프 Spec G6 입력 보류 사유와 화면 표시용 설명.
+INPUT_HOLD_REASON_LABELS: Mapping[InputHoldReason, str] = MappingProxyType(
+    {
+        InputHoldReason.HIRE_ID_MISSING: "입사자 식별자 없음",
+        InputHoldReason.START_DATE_MISSING: "입사일 없음",
+        InputHoldReason.CAREER_TYPE_MISSING: "경력 구분 없음",
+        InputHoldReason.LEADER_MISSING: "리더 없음",
+        InputHoldReason.TEMPLATE_MISSING: "체크리스트 양식 없음",
+        InputHoldReason.TODAY_MISSING: "기준 날짜 없음",
+        InputHoldReason.BUDDY_MISSING: "버디 없음",
+    }
+)
+# PROVISIONAL: 그래프 Spec G3 버디 누락만 페이지 단위 보류.
+PAGE_HOLD_REASONS: Mapping[InputHoldReason, Role] = MappingProxyType(
+    {InputHoldReason.BUDDY_MISSING: Role.BUDDY}
 )

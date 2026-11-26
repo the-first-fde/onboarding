@@ -18,7 +18,7 @@
 |---|---|---|---|
 | 예빈 | 계획·진행 노드 | 계획 초안·진행 요약 | [계획 Spec](../../../docs/specs/onboarding-planning.md) |
 | 정현 | 검토·수정 요청·승인 흐름 | 검토 결과와 흐름 검증 | [검토 Spec](../../../docs/specs/review-approval.md) |
-| 종은 | 초안 생성 노드의 인터페이스 협의 | 입력·결과 전달 합의 | [안내 Spec](../../../docs/specs/communication-preparation.md) |
+| 종은 | 3-2 담당별 준비 체크리스트 워크플로(`preparation_checklist/`) | 입력 검증·담당별 목록·구간·노션 페이지 초안(쓰기 없음) | [안내 Spec](../../../docs/specs/communication-preparation.md) · [그래프 Spec](../../../docs/specs/preparation-checklist-graph.md) |
 
 ## 4. 개발에 필요한 기초 개념
 
@@ -26,9 +26,11 @@
 
 ## 5. 파일 및 모듈별 역할
 
-[preparation_checklist/](preparation_checklist/README.md)는 담당별 준비 목록 생성·기준일 계산·표시 구간 분류를 담당하는 순수 함수 패키지다.
+워크플로 코드는 이 폴더에 두고, 파일이 여러 개면 워크플로별 디렉터리를 만든다.
 
-현재 폴더에는 README와 지침이 있다. 실행 예제는 [smoke.py](../smoke.py)의 run_smoke다. 승인 후 이곳에 업무 노드와 그래프 조립 코드를 책임별로 둔다.
+[preparation_checklist/](preparation_checklist/README.md)는 담당별 준비 목록 생성·기준일 계산·표시 구간 분류와 입력 검증 → 목록 → 구간 → 노션 페이지 초안 그래프를 제공한다(외부 쓰기 없음).
+
+기술 실행 예제는 [smoke.py](../smoke.py)의 run_smoke다. 3-2 업무 그래프 실행 예제는 [준비 체크리스트 안내](preparation_checklist/README.md#9-최소-구현-예제)에 있다. 다른 업무 노드와 그래프 조립 코드도 승인된 범위에서 워크플로별로 둔다.
 
 ## 6. 입력 및 출력 데이터
 
@@ -80,9 +82,10 @@ assert graph_result() == 1
 
 ```bash
 uv run --locked pytest -q tests/test_smoke.py::test_graph_runs_without_network
+uv run --locked pytest -q tests/workflows/preparation_checklist
 ```
 
-카운터 검증 한 건이 통과해야 한다. 실패하면 노드 추가·엣지 순서와 반환값을 smoke.py에서 확인한다. 고객사 자료가 필요한 결과는 승인된 비식별 근거와 계약이 확보된 뒤 별도 인수 조건으로 검증한다.
+기술 카운터와 준비 체크리스트 테스트가 통과해야 한다. 실패하면 해당 그래프의 노드·엣지 순서와 반환값을 확인한다. 고객사 자료가 필요한 결과는 승인된 비식별 근거와 계약이 확보된 뒤 별도 인수 조건으로 검증한다.
 
 ## 12. 개발 완료 기준
 

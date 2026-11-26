@@ -158,3 +158,24 @@ class SectionedChecklist:
 
     today: date
     sections: tuple[ChecklistSection, ...]
+
+
+class InputHoldReason(StrEnum):
+    """PROVISIONAL G6: 입력 누락 사유와 표시 순서."""
+
+    HIRE_ID_MISSING = "HIRE_ID_MISSING"
+    START_DATE_MISSING = "START_DATE_MISSING"
+    CAREER_TYPE_MISSING = "CAREER_TYPE_MISSING"
+    LEADER_MISSING = "LEADER_MISSING"
+    TEMPLATE_MISSING = "TEMPLATE_MISSING"
+    TODAY_MISSING = "TODAY_MISSING"
+    BUDDY_MISSING = "BUDDY_MISSING"
+
+
+@dataclass(frozen=True)
+class RoleSections:
+    """담당별 양식 순서 ID와 표시 구간."""
+
+    role: Role
+    item_ids: tuple[str, ...]
+    sectioned: SectionedChecklist
