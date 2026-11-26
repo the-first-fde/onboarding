@@ -61,3 +61,7 @@ data/uploads/
 .AppleDouble
 Thumbs.db
 Desktop.ini
+
+# 개인 로컬 Issue 초안: 등록 후 GitHub Issue가 기준 (#4~#8)
+docs/issue-drafts/feature-checklist-*.md
+docs/issue-drafts/research-checklist-schedule-inputs.md
