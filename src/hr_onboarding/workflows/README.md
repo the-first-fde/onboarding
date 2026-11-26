@@ -26,6 +26,8 @@
 
 ## 5. 파일 및 모듈별 역할
 
+[preparation_checklist/](preparation_checklist/README.md)는 담당별 준비 목록 생성·기준일 계산·표시 구간 분류를 담당하는 순수 함수 패키지다.
+
 현재 폴더에는 README와 지침이 있다. 실행 예제는 [smoke.py](../smoke.py)의 run_smoke다. 승인 후 이곳에 업무 노드와 그래프 조립 코드를 책임별로 둔다.
 
 ## 6. 입력 및 출력 데이터
