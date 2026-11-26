@@ -27,6 +27,15 @@ Markdown은 텍스트 문서 형식이다. 런타임 프롬프트는 에이전�
 ## 5. 파일 및 모듈별 역할
 
 [template.md](template.md)는 작성 양식이다. 구체적인 역할 문서는 각 Spec과 데이터 근거 확인 후 이곳에 추가한다.
+## 5. 파일 및 모듈별 역할
+
+[template.md](template.md)는 작성 양식이다. 구체적인 역할 문서는 각 Spec과 데이터 근거 확인 후 이곳에 추가한다.
+
+| 파일 | 상태 | 계약 |
+|---|---|---|
+| [onboarding-planning.md](onboarding-planning.md) | PROVISIONAL — 온보딩 계획 수립 | [계획 계약](../docs/contracts/onboarding-planning.md) |
+| [onboarding-progress.md](onboarding-progress.md) | PROVISIONAL — 온보딩 진행 상황 관리 | [계획 계약](../docs/contracts/onboarding-planning.md) 2절 |
+
 
 ## 6. 입력 및 출력 데이터
 
