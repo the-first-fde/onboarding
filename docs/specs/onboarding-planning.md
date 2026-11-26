@@ -1,7 +1,7 @@
 # 담당 업무 Spec: 온보딩 계획 수립·진행 상황 관리
 
-- 담당: 예빈님 (이전 대화 기록, 현재 분담 재확인 필요)
-- 상태: BLOCKED — 샘플/업무 규칙 미수령, 초기 명세 초안만 준비
+- 담당: 예빈 (2026-11-27 본인 확인)
+- 상태: DRAFT — 2026-11-25 데이터팩 수령. [잠정 계약](../contracts/onboarding-planning.md)과 런타임 정의 1. [계획 수립](../../agents/onboarding-planning.md) · 2. [진행 상황 관리](../../agents/onboarding-progress.md)를 PROVISIONAL로 작성. 업무 구현(Python)은 보류
 - 관련 잠정 데이터 요구: [계약 초안](../contracts/onboarding-planning.md)
 - 확인된 사실: 사용자 요청에 따라 초기화만 수행하며 업무 구현은 보류한다.
 - 업무 목표: 온보딩 계획 수립·진행 상황 관리
