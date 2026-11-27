@@ -1,31 +1,17 @@
 {
+  "env": {
+    "ECC_DISABLED_HOOKS": "pre:write:doc-file-warning,pre:edit-write:suggest-compact,pre:bash:tmux-reminder,pre:bash:git-push-reminder,stop:evaluate-session,stop:desktop-notify"
+  },
   "permissions": {
     "allow": [
-      "Bash(git status:*)",
-      "Bash(git diff:*)",
-      "Bash(git log:*)",
-      "Bash(uv run --locked python scripts/verify.py)",
-      "Bash(uv run --locked python scripts/doctor.py)"
-    ],
-    "ask": [
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(git merge:*)",
-      "Bash(gh:*)"
+      "Bash(codex exec:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(npm run build:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)"
     ],
     "deny": [
-      "Read(./.env)",
-      "Edit(./.env)",
-      "Read(./secrets/**)",
-      "Edit(./secrets/**)",
-      "Read(./credentials/**)",
-      "Edit(./credentials/**)",
-      "Bash(git reset --hard:*)",
-      "Bash(git clean:*)",
-      "Bash(git push --force:*)",
-      "mcp__*",
-      "Read(./.env.local)",
-      "Edit(./.env.local)",
       "Read(./**/.env)",
       "Edit(./**/.env)",
       "Read(./**/.env.local)",
@@ -33,44 +19,20 @@
       "Read(./**/secrets/**)",
       "Edit(./**/secrets/**)",
       "Read(./**/credentials/**)",
-      "Edit(./**/credentials/**)",
       "Read(./**/*.key)",
-      "Edit(./**/*.key)",
       "Read(./**/*.pem)",
-      "Edit(./**/*.pem)",
       "Read(./**/token.json)",
-      "Edit(./**/token.json)",
       "Read(./**/credentials.json)",
-      "Edit(./**/credentials.json)",
-      "Read(./.claude/settings.local.json)",
-      "Edit(./.claude/settings.local.json)"
-    ]
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.venv/bin/python \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect_files.py",
-            "timeout": 10,
-            "onFailure": "block"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.venv/bin/python \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/after_edit.py",
-            "timeout": 30
-          }
-        ]
-      }
+      "Read(./knowledge/raw/**)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean:*)",
+      "Bash(git push --delete:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push origin main:*)",
+      "Bash(git push origin HEAD:main:*)",
+      "Bash(git commit --no-verify:*)",
+      "Bash(gh pr merge:*)"
     ]
   }
 }

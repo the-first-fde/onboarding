@@ -1,49 +1,58 @@
-# The First 공통 지침
+# Claude Code 개발 안내
+@AGENTS.md
+@specs/constitution.md
 
-## 범위와 근거
-- 3인 HR onboarding, 제출 2026-12-03 23:59 KST.
-- 초기화 명세: [docs/specs/0001-bootstrap.md](docs/specs/0001-bootstrap.md).
-- Python 3.12, uv.lock, LangGraph 오케스트레이션, Claude Agent SDK 실행, Markdown 업무 정의, MCP.
-- 프론트엔드/FastAPI 없음. 샘플 수령 전 HR Schema/공통 State/업무 규칙/공통 업무 fixtures 확정 금지.
-- 확인된 사실과 잠정 가정은 [open questions](docs/open-questions.md)에 구분한다.
-- 실제 고객사 데이터와 실제 인증을 사용하지 않는다. 실제 MCP 쓰기는 금지한다.
-- 고객사 데이터팩(`FF_HR과제_데이터팩_*/`, gitignore)은 로컬 참조 전용이다. `00_읽는_순서.md`부터 읽고, 문서에는 경로·절 번호로만 인용한다. 원문을 commit/Issue/PR/fixture에 복사하지 않는다.
-- 실제 메일과 입사 확정은 사람이 수동 수행한다.
+## 역할
+- Claude: 요구사항 분석, 기획, 명세(Feature)·설계(Plan·ADR·계약), 리뷰, 검증, 커밋·PR 생성
+- Codex(`AGENTS.md`의 "Codex 구현 규칙"): 구현과 테스트 코드 작성. 기본 `gpt-6.1-terra` medium, 전환 조건 발생 시 `gpt-6.1-sol` medium
+- 사람: GitHub PR 리뷰와 머지. 개발 루프 안에서는 아래 "사람 개입 지점"에서만 멈춘다
 
-## 작업 방법
-- [공통 Handbook](docs/guides/README.md), [CONTRIBUTING](CONTRIBUTING.md)를 사람/Claude가 함께 사용한다.
-- 변경 전 기존 파일과 Git 상태를 확인하고 보존한다. 작은 Issue/Spec/PR 단위로 작업한다.
-- 명세 → 인수 조건/테스트 → 최소 구현 → 검증 → 독립 AI 리뷰 → 사람 리뷰.
-- 영어 식별자, 타입 힌트, 한국어 설명의 Google Style Docstring을 사용한다.
-- 실행 검증은 `uv run --locked python scripts/verify.py`.
-- PASS/FAIL/NOT RUN을 실제 증거로 구분한다. 초기 커버리지 측정, 이후 80% 목표.
-- 개발 agents는 `.claude/agents/`, 업무 agents는 `agents/`. 런타임에 개발 도구 권한을 주지 않는다.
+Claude는 `apps/`·`tests/`·`migrations/`·`workflows/`·`mcp_servers/`의 코드를 직접 작성하거나 고치지 않는다. 사소한 수정도 Codex에 넘긴다.
+Claude가 직접 수정하는 범위는 `specs/`, `docs/`, `policies/`, `knowledge/`(raw 제외), `CLAUDE.md`, `AGENTS.md`, `.claude/`다.
 
-## 승인과 No Silent Issues
-- commit/push/merge/remote 변경/Issue·milestone·PR 외부 등록/유료 가입/비밀 등록은 별도 명시 승인 필요.
-- 최초 commit도 예외 승인 후 사람이 실행한다. 일반 작업은 feature 브랜치에서 진행한다.
-- 자동 commit/push/merge, ECC 전체 설치/자동 갱신/지속 학습을 금지한다.
-- 팀 판단/범위 밖/차단 문제를 발견하면 즉시 보고한다. 임의 수정하지 않는다.
-- 조회 가능한 기존 Issue에서 중복을 확인하고 공통 양식 초안을 작성해 등록 승인을 요청한다.
-- 조회 불가면 중복 확인 NOT RUN으로 표시한다. 안전하고 독립적인 작업은 계속한다.
-- 보안 문제는 비밀값/개인정보를 제외해 보고한다. 공개 Issue에 민감 내용을 기록하지 않는다.
+## 기능 개발 순서
+1. Branch: 최신 `main`에서 `feat/F-NNN-<slug>`를 만든다. 지침·설정은 `chore/<slug>`, 문서만은 `docs/<slug>`
+2. Analysis: PRD·constitution·관련 계약·`docs/source-register.md` 근거를 확인한다. 근거 없는 업무 규칙은 Feature의 Open Questions에 남긴다
+3. Spec: `specs/features/F-NNN.md`에 목적·EARS 완료 조건·건드리지 말 것·선행 조건을 쓴다
+4. Plan: `specs/plans/TEMPLATE.md`를 복사해 `specs/plans/F-NNN.md`를 쓴다. 시그니처·책임·Scope 파일·AC별 테스트 케이스만 적고 구현 코드는 쓰지 않는다. 아키텍처 변경·의존성 추가는 같은 브랜치에 ADR(Proposed)을 함께 쓴다
+5. Handoff: Plan 상태를 `Ready`로 바꾸고 묻지 않고 Codex를 실행한다
+6. Review: Plan의 Implementation Log와 `git diff main...HEAD`를 읽고, AC 충족·Scope 준수·constitution 위반(allowlist, 합격≠입사확정, 결정론, 격리)을 검토한다. 필요 시 `ecc:python-reviewer`·`ecc:security-reviewer`를 쓴다
+7. Fix loop: 지적 사항은 `codex exec resume --last`로 전달한다. 최대 3회 왕복 후에도 남으면 PR 본문 "남은 문제"에 적는다
+8. Verify: 직접 검증 명령을 실행하고 결과를 `docs/verification.md`에 PASS/FAIL/NOT RUN으로 기록한다
+9. Ship: 커밋 1개 → `git push -u origin <branch>` → `gh pr create`. 본문은 `.github/pull_request_template.md` 형식으로 쓰고 Open Questions·가정·NOT RUN 항목을 숨기지 않는다
 
-## 비밀과 외부 실행
-- 실제 환경변수 값/비밀은 Private Git에도 절대 등록하지 않는다.
-- 실제 `.env`, 인증 파일, 개인 설정은 생성·열람·출력하지 않는다. `.env.example`만 명세로 사용한다.
-- 로그/AI 입력/Issue/PR에 비밀 또는 HR 원본 데이터를 넣지 않는다.
-- 공유 불필요 파일은 `.gitignore`, 공통 설정/uv.lock/검토된 가상 fixtures는 추적한다.
-- Sonar는 CI 전용이다. 로컬 설치/호출/verify/pre-commit에 추가하지 않는다.
-- Sonar 기존 Organization/Project를 재사용한다. 외부 분석 승인 전 활성화/전송하지 않는다.
-- 세부 정책: [SECURITY](SECURITY.md), [보안 가이드](docs/guides/security-guide.md).
+이 프로젝트에서는 위 9단계의 커밋·push·PR 생성을 사용자 확인 없이 수행한다(전역 지침의 "요청 시에만 커밋/push"를 이 저장소에 한해 대체한다). 머지는 하지 않는다.
 
-## 지침 탐색
-- 착수 전에 루트 [README](README.md)와 이 파일을 읽고, 작업 경로의 상위·대상 디렉터리에 있는 README.md와 CLAUDE.md를 확인한다. 대상에 별도 문서가 없으면 가장 가까운 상위 안내를 따른다.
-- 구현 범위를 정하기 전에 해당 Issue(있다면), Spec, 잠정 데이터 계약을 읽고 내 작업과 인접 모듈의 책임을 확인한다. 개발 안내와 실제 구현이 다르면 두 위치와 영향을 사용자에게 보고한다.
-- README는 사람과 AI가 함께 보는 개발 안내다. CLAUDE.md는 AI가 준수할 필수 지침이다. 관련 작업 경로의 지침만 읽는다.
-- 구현으로 작업 위치·동작·명령·의존성·테스트 방법이 바뀌면 관련 README를 같은 변경에서 갱신하고 링크와 명령을 검증한다.
-- 문서와 코드의 차이 중 팀 판단이 필요한 것은 No Silent Issues에 따라 근거와 영향, 확인할 결정을 공유하고 Issue 등록을 제안한다.
-- 각 CLAUDE.md는 200줄 이내, 중복 규칙은 기준 문서에 링크한다.
-- ECC 원본은 `third_party/ecc/`, 실행용 수정본은 `.claude/`. 프로젝트 정책이 우선한다.
-- hooks/permissions는 보조 장치다. 개인 설정·셸·심볼릭 링크·직접 도구 실행으로 우회 가능하다.
-- 모르는 설정을 임의 허용하지 말고 `/permissions`, `/hooks`로 확인한다.
+## Codex 핸드오프
+- 실행: `codex exec -m gpt-6.1-terra -c model_reasoning_effort=medium -s workspace-write --add-dir ~/.cache/uv -C <repo> "<프롬프트>" < /dev/null`
+  - `--add-dir ~/.cache/uv`: 샌드박스가 uv 캐시 쓰기를 막아 `uv run`이 실패하는 것을 피한다
+  - `< /dev/null`: 백그라운드 실행 시 stdin 대기("Reading additional input from stdin...")로 멈추는 것을 피한다
+- 프롬프트: "`AGENTS.md`를 따르고 `specs/plans/F-NNN.md`와 연결된 Feature만 기준으로 구현하라"만 쓴다. 명세 내용을 복사하지 않는다
+- 실행 전 현재 브랜치가 Plan의 Branch와 같은지 확인한다
+- 재개: `codex exec resume --last -m <모델> -c model_reasoning_effort=medium -c sandbox_mode="workspace-write" -c 'sandbox_workspace_write.writable_roots=["<uv 캐시 절대 경로>"]' "<지적 사항>" < /dev/null`
+  - `resume`은 `-s`·`--add-dir`·`-C`를 받지 않으므로 저장소 디렉터리에서 실행한다
+- Log에 전환 조건이 기록되면 `-m gpt-6.1-sol`로 같은 Plan을 다시 실행하고 전환 시점·사유를 Log에 남긴다
+- Codex가 Log에 질문을 남기고 멈추면, 명세로 답할 수 있는 것은 Claude가 Plan을 보강해 재개하고, 회사 규칙 판단이 필요한 것만 사람 개입 지점으로 올린다
+
+## 사람 개입 지점
+아래에 해당할 때만 멈추고 사용자에게 묻는다. 그 외에는 판단 근거를 Plan·PR에 남기고 진행한다.
+- 실제 HR 원본·`.env`·비밀키·실제 외부 시스템(ATS/Notion/메일/Slack 등)에 접근하거나 전송해야 할 때
+- 업무 규칙 근거가 없어 결과 동작이 갈리는 결정(추정으로 구현하지 않는다)
+- `main` 직접 변경, force push, 머지, 브랜치·태그 삭제, 원격 저장소 설정 변경
+- 현재 Feature 범위를 벗어나는 변경이나 constitution 자체의 변경
+- 권한 거부·sandbox 차단을 우회해야만 진행 가능한 경우(우회하지 않고 필요한 규칙 문자열을 안내한다)
+
+## 제품 런타임 경계
+개발용 Claude Code와 제품 내부 Claude Agent SDK 런타임을 분리한다.
+현재 SDK·MCP·RAG는 설계/경계만 있으며 실행 구현을 가장하지 않는다.
+SDK를 연결할 때는 single agent + domain skills, 구조화 출력, 도구 allowlist,
+PreToolUse 권한 검사, PostToolUse 결과 검증, 서버 승인 게이트 및 비용 한도를 함께 구현한다.
+현재 mock 모드 외 실행은 금지되어 있다. Hook만으로 권한을 보장할 수 없다.
+
+## Hook·권한
+- ECC hook 중 알림·제안성 hook은 `.claude/settings.json`의 `ECC_DISABLED_HOOKS`로 끈다. 차단성 안전 hook(`pre:bash:block-no-verify`, `pre:bash:commit-quality`, `pre:config-protection`)은 유지한다
+- hook이 차단하면 우회(`--no-verify`, 설정 완화)하지 않고 원인을 고친다. 반복적으로 개발을 막는 hook은 끌 ID와 사유를 사용자에게 제안한다
+
+## 검증 명령
+- `uv run pytest`
+- `npm run build` (`apps/frontend`)
