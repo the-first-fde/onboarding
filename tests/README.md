@@ -26,7 +26,7 @@ pytest는 test_로 시작하는 테스트를 찾는다. assert는 실제 결과�
 
 ## 5. 파일 및 모듈별 역할
 
-[test_smoke.py](test_smoke.py)는 그래프·SDK·Markdown·MCP 가상 응답을 검사한다. [test_hooks.py](test_hooks.py)는 hook 판단을 검증한다. [conftest.py](conftest.py)는 테스트 중 소켓 연결을 차단한다. [collaboration/](collaboration)은 GitHub → Notion 동기화를 transport fake와 in-memory fake로 검증한다.
+[test_smoke.py](test_smoke.py)는 그래프·SDK·Markdown·MCP 가상 응답을 검사한다. [conftest.py](conftest.py)는 테스트 중 소켓 연결을 차단한다. [collaboration/](collaboration)은 GitHub → Notion 동기화를 transport fake와 in-memory fake로 검증한다.
 
 ## 6. 입력 및 출력 데이터
 
@@ -34,7 +34,7 @@ pytest는 test_로 시작하는 테스트를 찾는다. assert는 실제 결과�
 
 ## 7. 다른 모듈과의 관계
 
-[Python 패키지](../src/hr_onboarding/README.md)와 [hooks](../.claude/README.md)를 검증한다. 승인된 공통 가상 데이터는 [fixtures](../fixtures/README.md)에 둘 수 있다.
+[Python 패키지](../src/hr_onboarding/README.md)를 검증한다. 승인된 공통 가상 데이터는 [fixtures](../fixtures/README.md)에 둘 수 있다.
 
 ## 8. 단계별 개발 방법
 
@@ -73,7 +73,6 @@ test_local_agent_has_no_tools()
 
 ```bash
 uv run --locked pytest -q tests/test_smoke.py
-uv run --locked pytest -q tests/test_hooks.py
 uv run --locked python scripts/verify.py
 ```
 
