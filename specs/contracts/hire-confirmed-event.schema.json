@@ -1,0 +1,131 @@
+{
+  "additionalProperties": false,
+  "description": "승인 전 검증하는 비개인 핸드오프 allowlist.",
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "event_type": {
+      "const": "HireConfirmedEvent",
+      "title": "Event Type",
+      "type": "string"
+    },
+    "event_id": {
+      "format": "uuid",
+      "title": "Event Id",
+      "type": "string"
+    },
+    "candidate_id": {
+      "pattern": "^[A-Za-z0-9-]{1,80}$",
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "employee_id": {
+      "pattern": "^[A-Za-z0-9-]{1,80}$",
+      "title": "Employee Id",
+      "type": "string"
+    },
+    "confirmed_on": {
+      "format": "date",
+      "title": "Confirmed On",
+      "type": "string"
+    },
+    "start_on": {
+      "format": "date",
+      "title": "Start On",
+      "type": "string"
+    },
+    "team_id": {
+      "pattern": "^[A-Za-z0-9-]{1,80}$",
+      "title": "Team Id",
+      "type": "string"
+    },
+    "leader_id": {
+      "pattern": "^[A-Za-z0-9-]{1,80}$",
+      "title": "Leader Id",
+      "type": "string"
+    },
+    "employment_type": {
+      "enum": [
+        "permanent",
+        "contract"
+      ],
+      "title": "Employment Type",
+      "type": "string"
+    },
+    "work_mode": {
+      "enum": [
+        "hybrid",
+        "office",
+        "remote"
+      ],
+      "title": "Work Mode",
+      "type": "string"
+    },
+    "probation_months": {
+      "maximum": 12,
+      "minimum": 0,
+      "title": "Probation Months",
+      "type": "integer"
+    },
+    "experienced": {
+      "title": "Experienced",
+      "type": "boolean"
+    },
+    "buddy_id": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Za-z0-9-]{1,80}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Buddy Id"
+    },
+    "laptop_required": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Laptop Required"
+    },
+    "source_refs": {
+      "items": {
+        "pattern": "^[A-Za-z0-9-]{1,80}$",
+        "type": "string"
+      },
+      "maxItems": 10,
+      "minItems": 1,
+      "title": "Source Refs",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "event_type",
+    "event_id",
+    "candidate_id",
+    "employee_id",
+    "confirmed_on",
+    "start_on",
+    "team_id",
+    "leader_id",
+    "employment_type",
+    "work_mode",
+    "probation_months",
+    "experienced",
+    "source_refs"
+  ],
+  "title": "HireConfirmedEvent",
+  "type": "object"
+}

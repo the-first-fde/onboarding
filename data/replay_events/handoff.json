@@ -1,0 +1,21 @@
+{
+  "status": "synthetic_only",
+  "events": [
+    {
+      "kind": "FinalPassDecided",
+      "occurred_on": "2026-07-31",
+      "observed_on": "2026-07-31"
+    },
+    {
+      "kind": "FinalPassNotified",
+      "occurred_on": "2026-08-04",
+      "observed_on": "2026-08-04"
+    },
+    {
+      "kind": "HireConfirmedEvent",
+      "occurred_on": "2026-08-10",
+      "observed_on": "2026-08-10",
+      "fixture": "data/fixtures/hire-confirmed.json"
+    }
+  ]
+}

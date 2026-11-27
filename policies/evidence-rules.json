@@ -1,0 +1,16 @@
+{
+  "status": "design",
+  "rules": {
+    "ON-07": "both documents required",
+    "ON-15": "use effective procedure and responsible role",
+    "ON-24": "verify entrant can open team page",
+    "ON-38": "actual completion != discovery timestamp",
+    "ON-49": "missing team criteria => NEEDS_REVIEW",
+    "ON-52": "8 attendance records; missing => propose makeup"
+  },
+  "source_refs": [
+    "DP-03",
+    "DP-04",
+    "DP-05"
+  ]
+}

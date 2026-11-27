@@ -1,0 +1,18 @@
+{
+  "trigger": "HireConfirmedEvent",
+  "approval": "HR",
+  "atomic": [
+    "event",
+    "case",
+    "outbox",
+    "audit"
+  ],
+  "initial_tasks": [
+    "ON-01",
+    "ON-02",
+    "ON-03"
+  ],
+  "task_due": "confirmed_on + 2 calendar days",
+  "mode": "mock",
+  "unknown_fields": "reject"
+}

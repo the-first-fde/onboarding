@@ -1,6 +1,6 @@
 # 협업 자동화: GitHub → Notion 동기화
 
-[프로젝트 시작 안내](../../README.md) · [공통 착수·완료 기준](../../CONTRIBUTING.md) · [운영 가이드](../../docs/guides/collaboration-integration-guide.md)
+[프로젝트 시작 안내](../../README.md) · [작업 지침](../../AGENTS.md) · [운영 가이드](../../docs/collaboration-integration-guide.md)
 
 ## 1. 이 디렉터리의 목적
 
@@ -8,13 +8,13 @@ GitHub Issue와 GitHub Project "HR AX"의 진행 상태를 Notion 데이터베�
 
 ## 2. 무엇을 개발해야 하는가?
 
-구현은 끝났다. 유지보수 대상은 Project 필드·옵션 변경 반영, Notion 속성 변경 반영, API 버전 갱신이다. 새 기능은 [Spec](../../docs/specs/github-notion-sync.md) 범위를 먼저 고친 뒤 추가한다.
+구현은 끝났다. 유지보수 대상은 Project 필드·옵션 변경 반영, Notion 속성 변경 반영, API 버전 갱신이다. 새 기능은 [Spec](../../specs/features/github-notion-sync.md) 범위를 먼저 고친 뒤 추가한다.
 
 ## 3. 담당자별 개발 업무
 
 | 담당 | 업무와 개발 대상 | 예상 산출물 | Spec |
 |---|---|---|---|
-| 공통 담당 미정 | 동기화 스크립트·workflow 유지 | 필드 매핑 갱신, 테스트 | [동기화 Spec](../../docs/specs/github-notion-sync.md) |
+| 공통 담당 미정 | 동기화 스크립트·workflow 유지 | 필드 매핑 갱신, 테스트 | [동기화 Spec](../../specs/features/github-notion-sync.md) |
 
 ## 4. 개발에 필요한 기초 개념
 
@@ -43,7 +43,7 @@ HR 런타임 코드와 import 관계가 없다. 공통 검증(`scripts/verify.py
 
 ## 8. 단계별 개발 방법
 
-1. [Spec](../../docs/specs/github-notion-sync.md)과 [ADR 0007](../../docs/adr/0007-github-notion-sync.md)에서 바꿀 매핑이나 동작을 확인한다.
+1. [Spec](../../specs/features/github-notion-sync.md)과 [ADR-003](../../specs/adr/0003-github-notion-sync.md)에서 바꿀 매핑이나 동작을 확인한다.
 2. `tests/collaboration/`에 실패하는 테스트를 먼저 추가한다.
 3. 위 표의 해당 파일만 고친다. 예: Project에 Status 옵션 추가 → `KNOWN_STATUSES`. Notion 속성 추가 → 보통 `OPTIONAL_PROPERTIES`와 `build_properties`.
 4. 아래 검증을 실행하고, 실제 Notion에서 dry-run으로 확인한다.
@@ -77,7 +77,7 @@ uv run --locked python scripts/verify.py
 
 두 번째 명령은 이 코드의 coverage를 따로 보여준다. 공통 verify의 coverage에는 포함되지 않는다.
 
-모든 테스트가 PASS여야 한다. 실패하면 첫 실패 테스트 이름으로 시나리오를 찾는다. 실제 API 연동은 [운영 가이드](../../docs/guides/collaboration-integration-guide.md) 14절에서 따로 검증한다.
+모든 테스트가 PASS여야 한다. 실패하면 첫 실패 테스트 이름으로 시나리오를 찾는다. 실제 API 연동은 [운영 가이드](../../docs/collaboration-integration-guide.md) 14절에서 따로 검증한다.
 
 ## 12. 개발 완료 기준
 
@@ -91,4 +91,4 @@ Notion→GitHub 쓰기와 Issue 삭제·이동 처리는 없다. 본문 토글 �
 
 ## 14. 관련 문서
 
-[작업 경로의 Claude 지침](CLAUDE.md) · [운영 가이드](../../docs/guides/collaboration-integration-guide.md) · [Spec](../../docs/specs/github-notion-sync.md) · [ADR 0007](../../docs/adr/0007-github-notion-sync.md) · [Notion API](https://developers.notion.com/reference/intro) · [GitHub Projects API](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects)
+[작업 경로의 Claude 지침](CLAUDE.md) · [운영 가이드](../../docs/collaboration-integration-guide.md) · [Spec](../../specs/features/github-notion-sync.md) · [ADR-003](../../specs/adr/0003-github-notion-sync.md) · [Notion API](https://developers.notion.com/reference/intro) · [GitHub Projects API](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects)
