@@ -1,0 +1,1 @@
+미구현 Claude Agent SDK single agent. domain skills: hiring handoff / evidence investigation / policy impact / draft writing. 구조화 finding/proposal만 반환하고 gateway를 통해 실행. hooks/permissions/budgets/evals 구현 전 실제 모델 호출 금지.

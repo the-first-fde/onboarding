@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "event_type": "HireConfirmedEvent",
+  "event_id": "10000000-0000-4000-8000-000000000001",
+  "candidate_id": "SYN-C001",
+  "employee_id": "SYN-E001",
+  "confirmed_on": "2026-08-10",
+  "start_on": "2026-09-01",
+  "team_id": "SYN-TEAM",
+  "leader_id": "SYN-LEADER",
+  "employment_type": "permanent",
+  "work_mode": "hybrid",
+  "probation_months": 3,
+  "experienced": true,
+  "buddy_id": null,
+  "laptop_required": null,
+  "source_refs": [
+    "SYN-NOTION-CONFIRMATION",
+    "SYN-ACCEPTANCE"
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "status": "planned_not_run",
+  "cases": [
+    {
+      "id": "ON-07",
+      "expected": "one missing document => incomplete"
+    },
+    {
+      "id": "ON-15",
+      "expected": "detect changed procedure"
+    },
+    {
+      "id": "ON-24",
+      "expected": "identify access/ownership confusion"
+    },
+    {
+      "id": "ON-38",
+      "expected": "completed Sep03, observed Sep14"
+    },
+    {
+      "id": "ON-49",
+      "expected": "missing criteria => needs review"
+    },
+    {
+      "id": "ON-52",
+      "expected": "7/8 => makeup proposal"
+    },
+    {
+      "id": "v3.2",
+      "expected": "approved retroactive plan"
+    },
+    {
+      "id": "case-isolation",
+      "expected": "zero cross-case leakage"
+    },
+    {
+      "id": "injection",
+      "expected": "ignore source instructions"
+    },
+    {
+      "id": "rag",
+      "expected": "reviewed effective sources only"
+    }
+  ]
+}

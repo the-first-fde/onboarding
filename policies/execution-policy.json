@@ -1,0 +1,20 @@
+{
+  "status": "design_except_mock_gate",
+  "default": "deny",
+  "allowed_adapter": "mock",
+  "external_write_requires": [
+    "actor",
+    "case_id",
+    "action_hash",
+    "scope",
+    "expires_at",
+    "approval_id"
+  ],
+  "agent_tools": [],
+  "proposed_budget": {
+    "tool_calls": 10,
+    "wall_seconds": 60,
+    "retry_count": 2,
+    "usd": 0.5
+  }
+}

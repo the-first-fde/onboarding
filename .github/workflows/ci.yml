@@ -29,12 +29,29 @@ jobs:
           version: '0.11.8'
           python-version: '3.12'
           enable-cache: false
-      - name: Install locked environment
-        run: uv sync --locked
       - name: Install checksum-verified Gitleaks
-        run: uv run --locked python scripts/install_tools.py
-      - name: Shared verification (no Claude or MCP credentials)
-        run: uv run --locked python scripts/verify.py
+        env:
+          GITLEAKS_VERSION: '8.30.0'
+          GITLEAKS_SHA256: '79a3ab579b53f71efd634f3aaf7e04a0fa0cf206b7ed434638d1547a2470a66e'
+        run: |
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl --proto '=https' --tlsv1.2 -sSfL -o "$RUNNER_TEMP/$archive" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" gitleaks
+      - name: Gitleaks secret scan
+        run: $RUNNER_TEMP/gitleaks dir . --redact --no-banner
+      - name: Install locked environment
+        run: uv sync --locked --no-build
+      - name: Backend tests (mock mode, no Claude or MCP credentials)
+        run: uv run --locked --no-build pytest -q
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Frontend build
+        working-directory: apps/frontend
+        run: |
+          npm ci --ignore-scripts
+          npm run build
       - name: Sonar status and activation check
         id: sonar
         env:

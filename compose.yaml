@@ -1,0 +1,53 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: hr_ops
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+    volumes:
+      - hr_db:/var/lib/postgresql/data
+      - ./migrations/init-vector.sql:/docker-entrypoint-initdb.d/vector.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U demo -d hr_ops"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    environment: &backend_env
+      DATABASE_URL: postgresql+psycopg://demo:demo@db:5432/hr_ops
+      DEMO_HR_TOKEN: local-demo-only
+      ADAPTER_MODE: mock
+    command: [uv, run, --no-sync, alembic, upgrade, head]
+    depends_on:
+      db:
+        condition: service_healthy
+  api:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    environment: *backend_env
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  worker:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    environment: *backend_env
+    command: [uv, run, --no-sync, python, -m, hr_ops.worker, --loop]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  frontend:
+    build: ./apps/frontend
+    environment:
+      API_PROXY_TARGET: http://api:8000
+    ports: ["127.0.0.1:5173:5173"]
+    depends_on: [api]
+volumes:
+  hr_db:

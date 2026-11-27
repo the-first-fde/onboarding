@@ -1,65 +1,22 @@
 [project]
-name = "hr-onboarding"
+name = "hr-operations"
 version = "0.1.0"
-description = "The First HR onboarding bootstrap; business contracts deferred"
-requires-python = ">=3.12,<3.13"
+description = "Independent HR operations: recruitment to onboarding"
+requires-python = ">=3.12"
 dependencies = [
-  "langgraph==1.2.24",
-  "claude-agent-sdk==0.2.188",
-  "mcp==2.3.0",
-  "pydantic==2.14.4",
-  "pydantic-settings==2.16.3",
+  "fastapi>=0.115,<1", "uvicorn>=0.30,<1", "pydantic>=2.9,<3",
+  "sqlalchemy>=2.0,<2.1", "alembic>=1.13,<2", "psycopg[binary]>=3.2,<4"
 ]
 
 [dependency-groups]
-dev = [
-  "ruff==0.17.6", "pytest==9.2.0", "pytest-asyncio==1.5.0",
-  "pytest-cov==7.1.0", "pre-commit==4.7.0", "pyright==1.1.414",
-  "pip-audit==2.10.1",
-]
+dev = ["pytest>=8,<10", "httpx>=0.27,<1"]
 
-[build-system]
-requires = ["hatchling==1.30.1"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/hr_onboarding"]
-
-[tool.ruff]
-target-version = "py312"
-line-length = 100
-exclude = ["third_party", ".venv", ".tools"]
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "D", "S"]
-ignore = ["D203", "D213"]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-
-[tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "D"]
-"scripts/**" = ["S603", "S607"]
-".claude/hooks/**" = ["S603", "S607"]
+[project.optional-dependencies]
+# Optional, intentionally not installed/called by the mock runtime.
+agent = ["claude-agent-sdk>=0.1,<1"]
+rag = ["langchain-core>=1,<2", "langchain-postgres>=0.0.12,<1", "pgvector>=0.3,<1"]
 
 [tool.pytest.ini_options]
+# scripts/collaboration(GitHub → Notion 동기화)은 HR 런타임과 분리한 채 import한다.
+pythonpath = ["apps/backend", "scripts"]
 testpaths = ["tests"]
-# 협업 자동화(scripts/collaboration)를 HR 런타임 패키지와 분리한 채 import한다.
-pythonpath = ["scripts"]
-asyncio_mode = "strict"
-asyncio_default_fixture_loop_scope = "function"
-addopts = "--strict-markers"
-
-[tool.coverage.run]
-source = ["hr_onboarding"]  # 협업 코드: pytest tests/collaboration --cov=collaboration
-relative_files = true
-branch = true
-
-[tool.coverage.report]
-show_missing = true
-
-[tool.pyright]
-include = ["src", "scripts/collaboration"]
-extraPaths = ["scripts"]
-pythonVersion = "3.12"
-typeCheckingMode = "standard"
