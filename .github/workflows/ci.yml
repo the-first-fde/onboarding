@@ -43,7 +43,7 @@ jobs:
       - name: Install locked environment
         run: uv sync --locked --no-build
       - name: Backend tests (mock mode, no Claude or MCP credentials)
-        run: uv run --locked pytest -q
+        run: uv run --locked --no-build pytest -q
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
