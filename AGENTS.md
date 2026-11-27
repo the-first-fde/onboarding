@@ -5,7 +5,7 @@
 
 ## 공통 규칙
 - Constitution → PRD → Feature → Plan → Implementation → Verification 순서로 진행한다.
-- 1 Feature + 1 Spec + 1 Conversation + 1 Plan + 1 Commit + 1 PR을 변경 추적 단위로 사용한다.
+- 1 Feature + 1 Spec + 1 Conversation + 1 Plan + 1 Commit(+ 1 Branch, 1 PR)을 변경 추적 단위로 사용한다. 세부 대응은 `CLAUDE.md`의 "작업 단위"를 따른다. 한 작업에서 다른 기능을 함께 구현하지 않는다.
 - 시작 시 git 상태, 관련 명세·계약·근거·선행조건을 확인한다. 미확인 회사 규칙은 질문으로 남긴다.
 - .github/ 및 .git/은 수정하지 않는다. main 직접 커밋, force push, PR 머지, 외부 메시지 전송은 하지 않는다.
 - 실제 .env, 비밀키, HR 원본을 출력·커밋·모델 전송하지 않는다. knowledge/raw와 로컬 데이터팩은 Git 제외다.

@@ -10,6 +10,22 @@
 Claude는 `apps/`·`tests/`·`migrations/`·`workflows/`·`mcp_servers/`의 코드를 직접 작성하거나 고치지 않는다. 사소한 수정도 Codex에 넘긴다.
 Claude가 직접 수정하는 범위는 `specs/`, `docs/`, `policies/`, `knowledge/`(raw 제외), `CLAUDE.md`, `AGENTS.md`, `.claude/`다.
 
+## 작업 단위
+구현은 1 기능 = 1 명세 = 1 채팅 = 1 계획 = 1 커밋으로 진행한다. 브랜치와 PR도 기능마다 하나다.
+
+| 단위 | 대응 |
+|---|---|
+| 기능 | `F-NNN` 하나 |
+| 명세 | `specs/features/F-NNN.md` |
+| 채팅 | Claude 세션 하나. 새 기능은 새 세션에서 시작한다. Codex는 같은 기능 안에서 `resume --last`로 한 세션을 이어 쓴다 |
+| 계획 | `specs/plans/F-NNN.md` |
+| 커밋 | PR을 만들 때 기능 브랜치의 커밋은 하나다. 리뷰·CI 수정 커밋은 PR에 추가하고 squash merge로 `main`에는 커밋 하나만 남긴다 |
+| 브랜치·PR | `feat/F-NNN-<slug>` 하나, PR 하나 |
+
+- 대화 중에 다른 기능 요청이나 범위 밖 변경이 나오면 현재 기능에 섞지 않는다. 새 Feature 초안이나 Open Questions로 남기고 새 세션에서 진행한다
+- 한 기능이 너무 커서 커밋 하나로 리뷰하기 어려우면 구현 전에 Feature를 나눈다
+- 지침·설정 변경(`chore/`)과 문서 변경(`docs/`)도 같은 원칙을 따른다
+
 ## 기능 개발 순서
 1. Branch: 최신 `main`에서 `feat/F-NNN-<slug>`를 만든다. 지침·설정은 `chore/<slug>`, 문서만은 `docs/<slug>`
 2. Analysis: PRD·constitution·관련 계약·`docs/source-register.md` 근거를 확인한다. 근거 없는 업무 규칙은 Feature의 Open Questions에 남긴다
