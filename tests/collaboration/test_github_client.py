@@ -34,7 +34,8 @@ def value(typename, field_name, **data):
 
 SCHEMA = [
     {"name": "Status", "dataType": "SINGLE_SELECT"},
-    {"name": "Priority", "dataType": "SINGLE_SELECT"},
+    {"name": "Track", "dataType": "SINGLE_SELECT"},
+    {"name": "Feature ID", "dataType": "TEXT"},
     {"name": "Size", "dataType": "SINGLE_SELECT"},
     {"name": "Estimate", "dataType": "NUMBER"},
     {"name": "Start date", "dataType": "DATE"},
@@ -49,7 +50,8 @@ FULL_VALUES = [
     value("ProjectV2ItemFieldNumberValue", "Estimate", number=3.0),
     value("ProjectV2ItemFieldDateValue", "Start date", date="2026-11-25"),
     value("ProjectV2ItemFieldDateValue", "Target date", date="2026-12-01"),
-    {"__typename": "ProjectV2ItemFieldTextValue"},
+    value(SELECT, "Track", name="DevOps"),
+    value("ProjectV2ItemFieldTextValue", "Feature ID", text="F-059"),
 ]
 
 
@@ -172,7 +174,8 @@ def test_issue_project_fields_are_parsed():
     assert result.lookup is ProjectLookup.OK
     assert result.fields == ProjectFields(
         status="In progress",
-        priority="P1",
+        track="DevOps",
+        feature_id="F-059",
         size="M",
         estimate=3.0,
         start_date="2026-11-25",
@@ -275,3 +278,85 @@ def test_unexpected_issue_list_shape_is_api_error():
 
     with pytest.raises(ApiError, match="unexpected_shape"):
         make_client(ObjectInsteadOfList()).list_issues()
+
+
+def meta_node(priority=None):
+    fields = [] if priority is None else [
+        {"__typename": "IssueFieldSingleSelectValue", "name": priority,
+         "field": {"name": "Priority"}}
+    ]
+    return {
+        "id": "I_node1", "issueType": {"name": "Task"}, "parent": {"number": 26},
+        "subIssuesSummary": {"total": 2, "completed": 1},
+        "blockedBy": {"totalCount": 2, "nodes": [{"number": 44}, {"number": 43}]},
+        "issueFieldValues": {"nodes": fields},
+    }
+
+
+def test_F_059_AC_01_03_04_metadata_values():
+    from collaboration.github_client import parse_issue_meta
+    for priority in ("P0", "P1", "P2", None, "P3"):
+        result = parse_issue_meta(meta_node(priority))
+        assert result.meta.priority == (priority if priority != "P3" else None)
+        assert result.meta.priority_known is (priority != "P3")
+        assert result.meta.blocked_by == (43, 44)
+
+
+def test_F_059_AC_02_truncated_and_malformed_metadata():
+    from collaboration.github_client import parse_issue_meta, IssueMetaLookup
+    node = meta_node()
+    node["blockedBy"]["totalCount"] = 3
+    assert parse_issue_meta(node).lookup is IssueMetaLookup.ERROR
+    assert parse_issue_meta({}).lookup is IssueMetaLookup.ERROR
+
+
+def test_F_059_AC_02_transport_graphql_and_index_errors():
+    from collaboration.github_client import IssueMetaLookup
+
+    class Transport:
+        def __init__(self, response):
+            self.response = response
+            self.calls = []
+
+        def __call__(self, request):
+            self.calls.append(json.loads(request.body))
+            return self.response
+
+    issue = make_client(GitHubFake(issues=[raw_issue(1)])).get_issue(1)
+    for response in (
+        HttpResponse(403, {}, b'{}'),
+        ok({"errors": [{"message": "forbidden"}]}),
+        ok({"data": {"repository": {"issue": meta_node()}}, "errors": [{"message": "partial"}]}),
+        ok({"data": {"repository": {"issue": {}}}}),
+    ):
+        transport = Transport(response)
+        client = make_client(transport, project_number=None)
+        assert client.get_issue_meta(issue).lookup is IssueMetaLookup.ERROR
+        assert client.load_issue_meta_index() is None
+
+
+def test_F_059_AC_01_index_paginates_without_project_number():
+    from collaboration.github_client import IssueMetaLookup
+
+    class Paged:
+        def __init__(self):
+            self.calls = []
+
+        def __call__(self, request):
+            payload = json.loads(request.body)
+            self.calls.append(payload)
+            cursor = payload["variables"]["cursor"]
+            node = meta_node("P2")
+            node["id"] = "I_node1" if cursor is None else "I_node2"
+            connection = {
+                "nodes": [node],
+                "pageInfo": {"hasNextPage": cursor is None, "endCursor": "next"},
+            }
+            return ok({"data": {"repository": {"issues": connection}}})
+
+    transport = Paged()
+    index = make_client(transport, project_number=None).load_issue_meta_index()
+    assert set(index) == {"I_node1", "I_node2"}
+    assert index["I_node1"].lookup is IssueMetaLookup.OK
+    assert index["I_node1"].meta.priority == "P2"
+    assert len(transport.calls) == 2

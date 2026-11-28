@@ -28,7 +28,7 @@ GitHub Issue와 GitHub Project "HR AX"의 진행 상태를 Notion 데이터베�
 | 파일 | 역할 |
 |---|---|
 | [http_api.py](http_api.py) | HTTPS JSON 요청, 429/5xx 재시도, 오류 분류(`AuthError`, `ApiError`, `UncertainWriteError`) |
-| [github_client.py](github_client.py) | Issue REST 조회, Project GraphQL 조회, 필드 매핑 표 `PROJECT_FIELD_MAP`, 허용 Status `KNOWN_STATUSES` |
+| [github_client.py](github_client.py) | Issue REST 조회, Project GraphQL 조회, 필드 매핑 표 `PROJECT_FIELD_MAP`, 허용 Status `KNOWN_STATUSES`, Issue 메타데이터(Organization Issue Field Priority `KNOWN_PRIORITIES`·Issue Type·Parent·Sub-issues·Blocked By) 조회 |
 | [notion_client.py](notion_client.py) | Data Source 스키마·페이지·블록 API, `NOTION_VERSION` |
 | [notion_sync.py](notion_sync.py) | Notion 속성 매핑(`REQUIRED_PROPERTIES` 필수, `OPTIONAL_PROPERTIES` 있을 때만), 본문 변환, upsert, 설정 검증, CLI |
 | [../../.github/workflows/notion-sync.yml](../../.github/workflows/notion-sync.yml) | 언제 실행할지, 어떤 권한과 인증을 줄지 |

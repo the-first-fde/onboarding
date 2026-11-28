@@ -32,8 +32,9 @@
 | 필수(내부) | Sync Key / Sync Hash / Body Hash / Repository | rich_text | 식별·변경 감지·전체 조회 필터 |
 | 필수 | GitHub URL / Issue State / Project Status / Assignees | url / select / select / rich_text | Issue·Project |
 | 선택 | Issue Number / Labels / Milestone / Close Reason / Created At / Updated At | number / multi_select / rich_text / select / date / date | Issue |
-| 선택 | Priority / Size / Estimate / Start Date / Target Date | select / select / number / date / date | Project |
-| 선택(진단) | Project Sync State / Synced At | select / date | 동기화 메타데이터 |
+| 선택 | Size / Estimate / Start Date / Target Date / Track / Feature ID | select / number / date / date / select / rich_text | Project |
+| 선택 | Priority / Issue Type / Parent Issue / Sub-issues Progress / Blocked By | select / select / rich_text / rich_text / rich_text | Issue(GraphQL `issueFieldValues`·`issueType`·`parent`·`subIssuesSummary`·`blockedBy`). F-059에서 Priority 원본을 Project field에서 Organization Issue Field로 바꿨다 |
+| 선택(진단) | Project Sync State / Issue Meta Sync State / Synced At | select / select / date | 동기화 메타데이터 |
 | 사람 소유 | Notes 등 그 밖의 속성 | 자유 | 동기화하지 않음 |
 
 Issue ID 속성은 Sync Key와 중복되어 두지 않는다.

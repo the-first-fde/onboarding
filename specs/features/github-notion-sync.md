@@ -4,12 +4,12 @@
 - 문제와 사용자 가치: 팀원이 Notion에서 개발 Issue와 Project 진행 상태를 확인한다. GitHub이 Single Source of Truth이고 Notion은 읽기용 대시보드다.
 - CONFIRMED 근거(2026-11-25 조사):
   - Organization Project는 `the-first-fde` #1 "HR AX" 하나이며 private이다. 연결 Repository는 `the-first-fde/onboarding`이다.
-  - Status 옵션은 `Backlog`, `Ready`, `In progress`, `In review`, `Done`이다. Priority는 단일 선택이지만 옵션이 없다. Size는 `XS`~`XL`, Estimate는 숫자, Start date·Target date는 날짜다.
+  - Status 옵션은 `Backlog`, `Ready`, `In progress`, `In review`, `Done`이다. Project의 Priority field는 옵션이 없고, 실제 Priority는 Organization Issue Field(`P0`/`P1`/`P2`)다(F-059에서 원본 교체). Size는 `XS`~`XL`, Estimate는 숫자, Start date·Target date는 날짜다.
   - Project 내장 workflow 7개가 켜져 있다(Auto-add to project, Item closed 등). 상세 필터와 전이 규칙은 API로 조회할 수 없어 UI 확인이 필요하다.
   - Notion API 최신 버전은 `2026-03-11`이다. Data Source ID와 Database ID는 서로 다르다. rich text는 2000자, 배열은 100개가 한도다. 429는 `Retry-After`를 따른다.
   - Repository는 PUBLIC이다(`gh repo view` 2026-11-25). Issue 0건, 우선순위 Label 없음, 중복 Issue 없음.
 - PROVISIONAL 가정: 팀원 3명의 Issue만 동기화한다(허용 목록). 15분 주기가 팀 요구에 충분하다.
-- 범위: Issue 생성·수정·담당자·Label·Milestone·Close/Reopen 반영, Project Status·Priority·Size·Estimate·Start/Target date 반영, 단일·전체·dry-run 수동 실행, 15분 예약 전체 동기화, 중복 방지, 재시도, 결과 요약.
+- 범위: Issue 생성·수정·담당자·Label·Milestone·Close/Reopen 반영, Project Status·Size·Estimate·Start/Target date·Track·Feature ID 반영, Issue Field Priority·Issue Type·Parent·Sub-issues·Blocked By 반영(F-059), 단일·전체·dry-run 수동 실행, 15분 예약 전체 동기화, 중복 방지, 재시도, 결과 요약.
 - 제외 범위: Notion→GitHub 쓰기, 양방향 동기화, PR DB, 메신저·Notion Inbox 알림, Webhook 서버, HR 데이터, AI 요약·분류, Project 자동 추가(Project 내장 Auto-add 사용).
 
 ## 입력/출력 및 계약 상태
@@ -39,7 +39,7 @@
 - 비교 대상은 GitHub 데이터의 해시다. Notion에서 사람이 바꾼 GitHub 소유 속성이나 지운 본문 토글은 GitHub에서 다음에 바뀔 때 복구된다.
 - Issue·Project 필드 변경은 다음 이벤트·예약·수동 실행에서 반영된다.
 - Close는 `Issue State=Closed`와 `Close Reason`만 바꾼다. Project Status를 Done으로 바꾸지 않는다. 불일치는 `state_mismatch`로 기록한다.
-- Project 조회 실패 시 Project 속성을 보존하고 `Project Sync State=error`, 종료 코드 1을 남긴다. 알 수 없는 Status는 `unmapped`로 기록하고 기존 Project Status를 보존한다.
+- Project 조회 실패 시 Project 속성을 보존하고 `Project Sync State=error`, 종료 코드 1을 남긴다. 알 수 없는 Status는 `unmapped`로 기록하고 기존 Project Status를 보존한다. Issue 메타데이터 조회 실패 시 해당 속성을 보존하고 `Issue Meta Sync State=error`, 종료 코드 1을 남긴다(F-059).
 - `NOTION_SYNC_ENABLED`가 정확히 `true`이고 dry-run이 아닐 때만 쓴다. 허용 목록이 비면 쓰기 설정은 실패한다.
 - 사람이 작성한 속성·블록은 본문 갱신 후에도 남는다.
 
@@ -71,7 +71,7 @@ Public Repository이므로 외부 사용자도 Issue 이벤트를 만들 수 있
 
 ## 위험/차단/질문
 
-- Priority 옵션 미정: 팀 결정 대기.
+- Priority: Organization Issue Field로 해결(F-059, #90).
 - Project 내장 workflow의 Status 전이(Item closed → Done 등)는 UI 확인 전 미확인이다.
 - Public Repository의 예약 workflow는 60일간 활동이 없으면 GitHub이 비활성화한다.
 

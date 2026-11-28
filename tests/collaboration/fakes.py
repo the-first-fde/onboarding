@@ -4,6 +4,10 @@ import itertools
 from dataclasses import replace
 
 from collaboration.github_client import (
+    META_ERROR,
+    IssueMeta,
+    IssueMetaLookup,
+    IssueMetaResult,
     NOT_IN_PROJECT,
     PROJECT_ERROR,
     IssueSnapshot,
@@ -51,6 +55,8 @@ class FakeGitHub:
         self.pull_requests: set[int] = set()
         self.projects: dict[str, ProjectResult] = {}
         self.project_available = True
+        self.meta_available = True
+        self.metas = {}
 
     def add(self, issue):
         self.issues[issue.number] = issue
@@ -62,6 +68,23 @@ class FakeGitHub:
         node_id = self.issues[number].node_id
         current = self.projects.get(node_id, ProjectResult(ProjectLookup.OK))
         self.projects[node_id] = ProjectResult(lookup, replace(current.fields, **fields))
+
+    def set_meta(self, number, lookup=IssueMetaLookup.OK, **fields):
+        node_id = self.issues[number].node_id
+        current = self.metas.get(node_id, IssueMetaResult(IssueMetaLookup.OK))
+        self.metas[node_id] = IssueMetaResult(lookup, replace(current.meta, **fields))
+
+    def get_issue_meta(self, issue):
+        return (
+            self.metas.get(issue.node_id, IssueMetaResult(IssueMetaLookup.OK))
+            if self.meta_available else META_ERROR
+        )
+
+    def load_issue_meta_index(self):
+        return (
+            {issue.node_id: self.get_issue_meta(issue) for issue in self.issues.values()}
+            if self.meta_available else None
+        )
 
     def get_issue(self, number):
         return None if number in self.pull_requests else self.issues[number]

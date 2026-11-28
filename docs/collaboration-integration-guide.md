@@ -86,7 +86,14 @@ Integration은 직접 연결해 준 페이지와 그 하위만 볼 수 있다. 6
 | Issue Number (권장) | 숫자 | Issue 번호 |
 | Labels (권장) | 다중 선택 | GitHub Label |
 | Milestone (권장) | 텍스트 | Milestone 제목 |
-| Priority (권장) | 선택 | Project 값. 현재 Project에 옵션이 없어 빈 값이다 |
+| Priority (권장) | 선택 | Organization Issue Field `Priority`(`P0`/`P1`/`P2`). Project의 `Priority` field는 쓰지 않는다 |
+| Issue Type (권장) | 선택 | `Epic` / `Feature` / `Task` / `Bug` |
+| Feature ID (권장) | 텍스트 | Project `Feature ID` 값(예: `F-059`) |
+| Track (권장) | 선택 | Project `Track` 값 |
+| Parent Issue | 텍스트 | 상위 Issue 번호(예: `#22`) |
+| Sub-issues Progress | 텍스트 | `완료/전체`(하위 Issue가 없으면 빈 값) |
+| Blocked By | 텍스트 | 선행 Issue 번호(예: `#43, #44`) |
+| Issue Meta Sync State | 선택 | `ok` / `error`. Issue 메타데이터(Priority·Issue Type·Parent·Sub-issues·Blocked By) 조회 결과 |
 | Target Date (권장) | 날짜 | Project 값 |
 | Synced At (권장) | 날짜 | 마지막으로 Notion에 쓴 시각 |
 | Project Sync State (권장) | 선택 | `ok` / `not_in_project` / `unmapped` / `error`. 확인이 필요한 페이지를 거를 때 쓴다 |
@@ -171,7 +178,7 @@ Variable은 비밀이 아니므로 Repository variable로 둔다.
 
 - Project 설정 → **Workflows**에서 **Auto-add to project**가 켜져 있고 필터가 `repo:the-first-fde/onboarding is:issue`류인지 확인한다. 새 Issue를 Project에 넣는 일은 이 내장 기능이 맡고, Actions는 하지 않는다.
 - **Item closed** 등 Status를 바꾸는 내장 workflow가 있다. 동기화는 Project에 실제 저장된 Status만 읽는다. Issue가 Closed인데 Status가 Done이 아니면 Summary에 `state_mismatch`로 표시한다. 자동으로 고치지 않는다.
-- Priority 옵션이 비어 있다. 팀이 정할 때까지 Notion Priority는 빈 값이다.
+- Priority는 Organization Issue Field에서 읽는다(F-059, #90). 조회에 실패하면 `Issue Meta Sync State=error`가 되고 기존 Notion 값을 보존한다.
 - Status 옵션을 추가·변경하면 그 값은 `unmapped`로 보고되고 기존 Notion 값이 유지된다. 이때 개발자가 `scripts/collaboration/github_client.py`의 `KNOWN_STATUSES`를 갱신한다(18절).
 
 ## 12. Dry-run과 수동 동기화
