@@ -29,3 +29,12 @@ G0 문서는 초안이며 조직별 승인자·일반 기한 규칙·정식 연�
 G1~G2는 합성 데이터용 초기 수직 흐름만 구현했다. 56개 전체 업무 생성, 정책 소급 migration,
 증거 진단·정식 RBAC·장기 승인·SDK·Wiki/RAG는 미완료다.
 보존한 .github의 이전 CI/Notion sync 및 Git hooks는 이전 경로를 참조하므로 새 구조와 호환되지 않을 수 있다.
+
+## F-059 Notion Sync Issue Field · 2026-11-28 KST
+| 검사 | 결과 | 범위 |
+|---|---|---|
+| `uv run --locked pytest -q` | PASS | 128 passed(collaboration 112 포함), F-059-AC-01~07 mock 테스트 |
+| Gitleaks `dir` (scripts·tests·specs·docs) | PASS | no leaks found |
+| GitHub 원본 조회(읽기 전용) | PASS | Organization Issue Field Priority 75/75 설정(P0 54·P1 18·P2 3), Project Priority 0/74 |
+| GitHub App 토큰 dry-run(`workflow_dispatch dry_run=true`) | NOT RUN | 사람 승인 필요. `issueFieldValues` 읽기 권한 확인 대상 |
+| 단일 Issue·전체 실제 동기화, Priority 누락 0 확인 | NOT RUN | 사람 승인과 Notion DB 속성 추가 필요 |

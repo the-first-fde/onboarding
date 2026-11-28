@@ -19,7 +19,8 @@ MAX_PAGES = 100
 # Project 필드 이름 → (GraphQL dataType, ProjectFields 속성). 2026-11-25 "HR AX" Project 조사 기준.
 PROJECT_FIELD_MAP: dict[str, tuple[str, str]] = {
     "Status": ("SINGLE_SELECT", "status"),
-    "Priority": ("SINGLE_SELECT", "priority"),
+    "Track": ("SINGLE_SELECT", "track"),
+    "Feature ID": ("TEXT", "feature_id"),
     "Size": ("SINGLE_SELECT", "size"),
     "Estimate": ("NUMBER", "estimate"),
     "Start date": ("DATE", "start_date"),
@@ -32,6 +33,7 @@ fragment FieldValue on ProjectV2ItemFieldValue {
   __typename
   ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { name } } }
   ... on ProjectV2ItemFieldDateValue { date field { ... on ProjectV2FieldCommon { name } } }
+  ... on ProjectV2ItemFieldTextValue { text field { ... on ProjectV2FieldCommon { name } } }
   ... on ProjectV2ItemFieldNumberValue { number field { ... on ProjectV2FieldCommon { name } } }
 }
 """
@@ -113,7 +115,8 @@ class ProjectFields:
     """동기화 대상 Project 필드 값. 비어 있으면 None."""
 
     status: str | None = None
-    priority: str | None = None
+    track: str | None = None
+    feature_id: str | None = None
     size: str | None = None
     estimate: float | None = None
     start_date: str | None = None
@@ -185,11 +188,151 @@ def parse_field_values(nodes: list[dict[str, Any]]) -> ProjectResult:
         name = (node.get("field") or {}).get("name")
         if name in PROJECT_FIELD_MAP:
             attribute = PROJECT_FIELD_MAP[name][1]
-            values[attribute] = node.get("name", node.get("date", node.get("number")))
+            values[attribute] = node.get(
+                "name", node.get("date", node.get("number", node.get("text")))
+            )
     fields = ProjectFields(**values)
     if fields.status is not None and fields.status not in KNOWN_STATUSES:
         return ProjectResult(ProjectLookup.UNMAPPED, fields)
     return ProjectResult(ProjectLookup.OK, fields)
+
+
+KNOWN_PRIORITIES = frozenset({"P0", "P1", "P2"})
+ISSUE_FIELD_PRIORITY = "Priority"
+
+
+class IssueMetaLookup(StrEnum):
+    """Issue 메타데이터 조회 결과 종류."""
+
+    OK = "ok"
+    ERROR = "error"
+
+
+@dataclass(frozen=True)
+class IssueMeta:
+    """동기화 대상 Issue 메타데이터 값."""
+
+    issue_type: str | None = None
+    priority: str | None = None
+    priority_known: bool = True
+    parent: int | None = None
+    sub_issues_total: int = 0
+    sub_issues_completed: int = 0
+    blocked_by: tuple[int, ...] = ()
+
+
+@dataclass(frozen=True)
+class IssueMetaResult:
+    """한 Issue의 메타데이터 조회 결과."""
+
+    lookup: IssueMetaLookup
+    meta: IssueMeta = field(default_factory=IssueMeta)
+
+
+META_ERROR = IssueMetaResult(IssueMetaLookup.ERROR)
+
+ISSUE_META_FRAGMENT = """
+fragment IssueMetaFields on Issue {
+  id issueType { name } parent { number } subIssuesSummary { total completed }
+  blockedBy(first: 50) { totalCount nodes { number } }
+  issueFieldValues(first: 20) { nodes {
+    __typename
+    ... on IssueFieldSingleSelectValue {
+      name field { ... on IssueFieldSingleSelect { name } }
+    }
+  } }
+}
+"""
+ISSUE_META_QUERY = (
+    """
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) { ...IssueMetaFields }
+  }
+}
+"""
+    + ISSUE_META_FRAGMENT
+)
+ISSUE_META_INDEX_QUERY = (
+    """
+query($owner: String!, $name: String!, $cursor: String) {
+  repository(owner: $owner, name: $name) {
+    issues(first: 100, after: $cursor, states: [OPEN, CLOSED]) {
+      pageInfo { hasNextPage endCursor } nodes { ...IssueMetaFields }
+    }
+  }
+}
+"""
+    + ISSUE_META_FRAGMENT
+)
+
+
+def _valid_blocked_by(blocked: dict[str, Any], nodes: Any) -> bool:
+    return (
+        isinstance(nodes, list)
+        and type(blocked["totalCount"]) is int
+        and blocked["totalCount"] == len(nodes)
+    )
+
+
+def _valid_sub_issues(total: Any, completed: Any) -> bool:
+    return (
+        type(total) is int
+        and type(completed) is int
+        and total >= 0
+        and 0 <= completed <= total
+    )
+
+
+def _valid_parent(number: Any) -> bool:
+    return number is None or (type(number) is int and number > 0)
+
+
+def _parse_priority(fields: list[dict[str, Any]]) -> str | None:
+    priority = None
+    for item in fields:
+        if (
+            item["__typename"] == "IssueFieldSingleSelectValue"
+            and item["field"]["name"] == ISSUE_FIELD_PRIORITY
+        ):
+            priority = item["name"]
+            if not isinstance(priority, str):
+                raise ValueError("invalid priority")
+    return priority
+
+
+def parse_issue_meta(node: dict[str, Any]) -> IssueMetaResult:
+    """Issue 메타데이터를 변환하고 잘리거나 잘못된 응답은 ERROR로 반환한다."""
+    try:
+        if not isinstance(node["id"], str) or not node["id"]:
+            return META_ERROR
+        issue_type = node["issueType"]
+        parent = node["parent"]
+        summary = node["subIssuesSummary"]
+        blocked = node["blockedBy"]
+        nodes = blocked["nodes"]
+        fields = node["issueFieldValues"]["nodes"]
+        if not _valid_blocked_by(blocked, nodes) or not isinstance(fields, list):
+            return META_ERROR
+        numbers = tuple(sorted(n["number"] for n in nodes))
+        total, completed = summary["total"], summary["completed"]
+        parent_number = parent["number"] if parent is not None else None
+        type_name = issue_type["name"] if issue_type is not None else None
+        if (
+            any(type(n) is not int or n <= 0 for n in numbers)
+            or not _valid_sub_issues(total, completed)
+            or not _valid_parent(parent_number)
+            or (type_name is not None and not isinstance(type_name, str))
+        ):
+            return META_ERROR
+        priority = _parse_priority(fields)
+        known = priority is None or priority in KNOWN_PRIORITIES
+        meta = IssueMeta(
+            type_name, priority if known else None, known, parent_number, total, completed, numbers
+        )
+        return IssueMetaResult(IssueMetaLookup.OK, meta)
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return META_ERROR
 
 
 class GitHubClient:
@@ -294,7 +437,54 @@ class GitHubClient:
         except (ProjectUnavailableError, ApiError, TransportError, KeyError, TypeError):
             return None
 
+    def get_issue_meta(self, issue: IssueSnapshot) -> IssueMetaResult:
+        """Issue 하나의 메타데이터를 조회하고 실패하면 ERROR를 반환한다."""
+        try:
+            variables = {"owner": self._owner, "name": self._name, "number": issue.number}
+            data = self._query(ISSUE_META_QUERY, variables)
+            return parse_issue_meta(data["repository"]["issue"])
+        except (
+            ProjectUnavailableError, ApiError, TransportError, KeyError, TypeError,
+            ValueError, AttributeError,
+        ):
+            return META_ERROR
+
+    def load_issue_meta_index(self) -> dict[str, IssueMetaResult] | None:
+        """전체 Issue의 메타데이터를 node ID별로 조회하고 실패하면 None을 반환한다."""
+        try:
+            results: dict[str, IssueMetaResult] = {}
+            cursor = None
+            seen = set()
+            for _ in range(MAX_PAGES):
+                variables = {"owner": self._owner, "name": self._name, "cursor": cursor}
+                data = self._query(ISSUE_META_INDEX_QUERY, variables)
+                connection = data["repository"]["issues"]
+                if (
+                    not isinstance(connection["nodes"], list)
+                    or type(connection["pageInfo"]["hasNextPage"]) is not bool
+                ):
+                    return None
+                for node in connection["nodes"]:
+                    result = parse_issue_meta(node)
+                    if result.lookup is IssueMetaLookup.ERROR:
+                        return None
+                    results[node["id"]] = result
+                if not connection["pageInfo"]["hasNextPage"]:
+                    return results
+                cursor = connection["pageInfo"]["endCursor"]
+                if not isinstance(cursor, str) or not cursor or cursor in seen:
+                    return None
+                seen.add(cursor)
+            return None
+        except (
+            ProjectUnavailableError, ApiError, TransportError, KeyError, TypeError,
+            ValueError, AttributeError,
+        ):
+            return None
+
     def _check_schema(self) -> None:
+        if self._project_number is None:
+            raise ProjectUnavailableError("project number not configured")
         data = self._query(SCHEMA_QUERY, {"owner": self._owner, "number": self._project_number})
         project = (data.get("organization") or {}).get("projectV2")
         if not project:
@@ -305,8 +495,6 @@ class GitHubClient:
                 raise ProjectUnavailableError(f"project field mismatch: {name}")
 
     def _query(self, query: str, variables: dict[str, Any]) -> dict[str, Any]:
-        if self._project_number is None:
-            raise ProjectUnavailableError("project number not configured")
         reply = self._api.request(
             "POST", "/graphql", {"query": query, "variables": variables}, idempotent=True
         )

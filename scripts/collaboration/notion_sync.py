@@ -21,6 +21,9 @@ from typing import Any
 
 from collaboration.github_client import (
     GITHUB_API_URL,
+    META_ERROR,
+    IssueMetaResult,
+    IssueMetaLookup,
     NOT_IN_PROJECT,
     PROJECT_ERROR,
     GitHubClient,
@@ -58,6 +61,13 @@ OPTIONAL_PROPERTIES: dict[str, str] = {
     "Created At": "date",
     "Updated At": "date",
     "Priority": "select",
+    "Issue Type": "select",
+    "Feature ID": "rich_text",
+    "Track": "select",
+    "Parent Issue": "rich_text",
+    "Sub-issues Progress": "rich_text",
+    "Blocked By": "rich_text",
+    "Issue Meta Sync State": "select",
     "Size": "select",
     "Estimate": "number",
     "Start Date": "date",
@@ -111,6 +121,7 @@ class IssueResult:
     outcome: SyncOutcome
     project: ProjectLookup | None = None
     detail: str = ""
+    meta: IssueMetaLookup | None = None
 
 
 @dataclass(frozen=True)
@@ -131,6 +142,8 @@ class SyncReport:
         for result in self.results:
             if result.outcome in (SyncOutcome.FAILED, SyncOutcome.CONFLICT):
                 return 1
+            if result.meta is IssueMetaLookup.ERROR:
+                return 1
             if result.project in (ProjectLookup.ERROR, ProjectLookup.UNMAPPED):
                 return 1
         return 0
@@ -149,10 +162,14 @@ class SyncReport:
             for r in self.results
             if r.outcome not in (SyncOutcome.UNCHANGED, SyncOutcome.CREATED, SyncOutcome.UPDATED)
             or r.project not in (None, ProjectLookup.OK, ProjectLookup.NOT_IN_PROJECT)
+            or r.meta is IssueMetaLookup.ERROR
             or r.detail
         ]
         lines.extend(
-            f"- #{r.number}: {r.outcome.value} project={r.project or '-'} {r.detail}".rstrip()
+            (
+                f"- #{r.number}: {r.outcome.value} project={r.project or '-'} "
+                f"meta={r.meta or '-'} {r.detail}"
+            ).rstrip()
             for r in attention
         )
         lines.extend(f"- orphan page (no GitHub issue): {key}" for key in self.orphans)
@@ -186,11 +203,15 @@ def _date(value: str | None) -> dict[str, Any]:
     return {"date": {"start": value} if value else None}
 
 
-def build_properties(issue: IssueSnapshot, project: ProjectResult) -> dict[str, Any]:
+def build_properties(
+    issue: IssueSnapshot, project: ProjectResult, meta: IssueMetaResult
+) -> dict[str, Any]:
     """GitHub이 소유하는 Notion 속성 값을 만든다.
 
     Project 조회가 ERROR면 Project 속성을 빼서 기존 값을 보존하고, UNMAPPED면
     Project Status만 뺀다. Issue Close 여부로 Project Status를 추론하지 않는다.
+    Issue 메타데이터가 ERROR면 관련 속성을 빼서 기존 값을 보존하고,
+    priority_known이 False면 Priority만 빼서 기존 값을 보존한다.
     """
     props: dict[str, Any] = {
         TITLE: {"title": [_text(issue.title[:MAX_TEXT_CHARS])]},
@@ -207,16 +228,28 @@ def build_properties(issue: IssueSnapshot, project: ProjectResult) -> dict[str, 
         "Updated At": _date(issue.updated_at),
         "Project Sync State": _select(project.lookup.value),
     }
-    if project.lookup is ProjectLookup.ERROR:
-        return props
-    fields = project.fields
-    if project.lookup is not ProjectLookup.UNMAPPED:
-        props["Project Status"] = _select(fields.status)
-    props["Priority"] = _select(fields.priority)
-    props["Size"] = _select(fields.size)
-    props["Estimate"] = {"number": fields.estimate}
-    props["Start Date"] = _date(fields.start_date)
-    props["Target Date"] = _date(fields.target_date)
+    props["Issue Meta Sync State"] = _select(meta.lookup.value)
+    if meta.lookup is IssueMetaLookup.OK:
+        value = meta.meta
+        if value.priority_known:
+            props["Priority"] = _select(value.priority)
+        props["Issue Type"] = _select(value.issue_type)
+        props["Parent Issue"] = _rich(f"#{value.parent}" if value.parent is not None else None)
+        props["Sub-issues Progress"] = _rich(
+            f"{value.sub_issues_completed}/{value.sub_issues_total}"
+            if value.sub_issues_total else None
+        )
+        props["Blocked By"] = _rich(", ".join(f"#{n}" for n in value.blocked_by))
+    if project.lookup is not ProjectLookup.ERROR:
+        fields = project.fields
+        if project.lookup is not ProjectLookup.UNMAPPED:
+            props["Project Status"] = _select(fields.status)
+        props["Size"] = _select(fields.size)
+        props["Estimate"] = {"number": fields.estimate}
+        props["Start Date"] = _date(fields.start_date)
+        props["Target Date"] = _date(fields.target_date)
+        props["Track"] = _select(fields.track)
+        props["Feature ID"] = _rich(fields.feature_id)
     return props
 
 
@@ -331,6 +364,7 @@ def _state_note(issue: IssueSnapshot, project: ProjectResult) -> str:
 def sync_issue(
     issue: IssueSnapshot,
     project: ProjectResult,
+    meta: IssueMetaResult,
     pages: Sequence[NotionPage],
     notion: NotionClient,
     types: Mapping[str, str],
@@ -361,29 +395,31 @@ def sync_issue(
     if issue.author.lower() not in settings.allowed_authors:
         return IssueResult(issue.number, SyncOutcome.SKIPPED, detail="author_not_allowed")
     if len(pages) > 1:
-        return IssueResult(issue.number, SyncOutcome.CONFLICT, project.lookup, "duplicate_pages")
-    props = fit_properties(build_properties(issue, project), types)
+        return IssueResult(
+            issue.number, SyncOutcome.CONFLICT, project.lookup, "duplicate_pages", meta.lookup
+        )
+    props = fit_properties(build_properties(issue, project, meta), types)
     blocks = body_blocks(issue.body, issue.url)
     props_hash, body_hash = content_hash(props), content_hash(blocks)
     note = _state_note(issue, project)
     page = pages[0] if pages else None
     if page and page.sync_hash == props_hash and page.body_hash == body_hash:
-        return IssueResult(issue.number, SyncOutcome.UNCHANGED, project.lookup, note)
+        return IssueResult(issue.number, SyncOutcome.UNCHANGED, project.lookup, note, meta.lookup)
     outcome = SyncOutcome.UPDATED if page else SyncOutcome.CREATED
     if not settings.write_enabled:
-        return IssueResult(issue.number, outcome, project.lookup, note)
+        return IssueResult(issue.number, outcome, project.lookup, note, meta.lookup)
     # 해시는 본문 교체가 끝난 뒤 저장한다. 중간에 실패하면 다음 실행이 다시 시도한다.
-    meta = fit_properties(
+    sync_meta = fit_properties(
         {"Sync Hash": _rich(props_hash), "Body Hash": _rich(body_hash), "Synced At": _date(now)},
         types,
     )
     if page is None:
-        _create(notion, sync_key(issue), props | meta, blocks)
-        return IssueResult(issue.number, outcome, project.lookup, note)
+        _create(notion, sync_key(issue), props | sync_meta, blocks)
+        return IssueResult(issue.number, outcome, project.lookup, note, meta.lookup)
     if page.body_hash != body_hash:
         _replace_body(notion, page.page_id, blocks)
-    notion.update_page(page.page_id, props | meta)
-    return IssueResult(issue.number, outcome, project.lookup, note)
+    notion.update_page(page.page_id, props | sync_meta)
+    return IssueResult(issue.number, outcome, project.lookup, note, meta.lookup)
 
 
 def _check_schema(notion: NotionClient) -> dict[str, str]:
@@ -400,6 +436,7 @@ def _check_schema(notion: NotionClient) -> dict[str, str]:
 def _safe_sync(
     issue: IssueSnapshot,
     project: ProjectResult,
+    meta: IssueMetaResult,
     pages: Sequence[NotionPage],
     notion: NotionClient,
     types: Mapping[str, str],
@@ -408,13 +445,17 @@ def _safe_sync(
 ) -> IssueResult:
     """Issue 하나의 API 실패를 결과로 기록한다. 인증 실패는 전체 실행을 멈춘다."""
     try:
-        return sync_issue(issue, project, pages, notion, types, settings, now)
+        return sync_issue(issue, project, meta, pages, notion, types, settings, now)
     except AuthError:
         raise
     except (ApiError, TransportError, UncertainWriteError) as error:
-        return IssueResult(issue.number, SyncOutcome.FAILED, project.lookup, _describe(error))
+        return IssueResult(
+            issue.number, SyncOutcome.FAILED, project.lookup, _describe(error), meta.lookup
+        )
     except _SHAPE_ERRORS:
-        return IssueResult(issue.number, SyncOutcome.FAILED, project.lookup, "unexpected_response")
+        return IssueResult(
+            issue.number, SyncOutcome.FAILED, project.lookup, "unexpected_response", meta.lookup
+        )
 
 
 def _describe(error: Exception) -> str:
@@ -452,9 +493,10 @@ def run_issue(
             result = IssueResult(number, SyncOutcome.SKIPPED, detail="author_not_allowed")
             return SyncReport(dry_run, (result,))
         project = github.get_project_result(issue)
+        meta = github.get_issue_meta(issue)
         pages = notion.find_pages(sync_key(issue))
         return SyncReport(
-            dry_run, (_safe_sync(issue, project, pages, notion, types, settings, now),)
+            dry_run, (_safe_sync(issue, project, meta, pages, notion, types, settings, now),)
         )
     except SchemaError as error:
         return SyncReport(dry_run, fatal=str(error))
@@ -483,14 +525,16 @@ def run_all(
         types = _check_schema(notion)
         issues = github.list_issues()
         index = github.load_project_index()
+        meta_index = github.load_issue_meta_index()
         pages: dict[str, list[NotionPage]] = defaultdict(list)
         for page in notion.list_pages(settings.repository):
             pages[page.sync_key].append(page)
         results = []
         for issue in issues:
             project = PROJECT_ERROR if index is None else index.get(issue.node_id, NOT_IN_PROJECT)
+            meta = META_ERROR if meta_index is None else meta_index.get(issue.node_id, META_ERROR)
             existing = pages.get(sync_key(issue), [])
-            results.append(_safe_sync(issue, project, existing, notion, types, settings, now))
+            results.append(_safe_sync(issue, project, meta, existing, notion, types, settings, now))
         known = {sync_key(issue) for issue in issues}
         unknown = [key for key in pages if key not in known]
         # Sync Key는 Notion에서 사람이 고칠 수 있으므로 형식이 맞는 값만 공개 로그에 쓴다.

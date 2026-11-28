@@ -1,7 +1,9 @@
 import subprocess
 
 import pytest
-from collaboration.github_client import ProjectFields, ProjectLookup, ProjectResult
+from collaboration.github_client import (
+    IssueMetaLookup, IssueMetaResult, ProjectFields, ProjectLookup, ProjectResult,
+)
 from collaboration.http_api import ApiError
 from collaboration.notion_sync import (
     BODY_MARKER,
@@ -58,7 +60,6 @@ def prop(notion, name):
 
 FIELDS = ProjectFields(
     status="In review",
-    priority="P1",
     size="S",
     estimate=2.0,
     start_date="2026-11-25",
@@ -71,7 +72,9 @@ def test_sync_key_uses_repository_and_stable_issue_id():
 
 
 def test_properties_map_issue_and_project_fields():
-    props = build_properties(make_issue(1), ProjectResult(ProjectLookup.OK, FIELDS))
+    props = build_properties(
+        make_issue(1), ProjectResult(ProjectLookup.OK, FIELDS), IssueMetaResult(IssueMetaLookup.OK)
+    )
 
     assert props["Title"]["title"][0]["text"]["content"] == "Issue 1"
     assert props["Issue Number"] == {"number": 1}
@@ -87,15 +90,19 @@ def test_properties_map_issue_and_project_fields():
 
 
 def test_project_error_omits_project_properties():
-    props = build_properties(make_issue(1), ProjectResult(ProjectLookup.ERROR))
+    props = build_properties(
+        make_issue(1), ProjectResult(ProjectLookup.ERROR), IssueMetaResult(IssueMetaLookup.OK)
+    )
 
-    for name in ("Project Status", "Priority", "Size", "Estimate", "Start Date", "Target Date"):
+    for name in ("Project Status", "Size", "Estimate", "Start Date", "Target Date"):
         assert name not in props
 
 
 def test_text_is_bounded_and_commas_removed_from_options():
     props = build_properties(
-        make_issue(1, title="t" * 5000, labels=("a,b",)), ProjectResult(ProjectLookup.OK)
+        make_issue(1, title="t" * 5000, labels=("a,b",)),
+        ProjectResult(ProjectLookup.OK),
+        IssueMetaResult(IssueMetaLookup.OK),
     )
 
     assert len(props["Title"]["title"][0]["text"]["content"]) == 2000
@@ -398,7 +405,7 @@ def test_partial_failure_is_recorded_and_fails_run(github, notion, monkeypatch):
     ("change", "name", "expected"),
     [
         ({"status": "In progress"}, "Project Status", {"select": {"name": "In progress"}}),
-        ({"priority": "P0"}, "Priority", {"select": {"name": "P0"}}),
+        ({"track": "DevOps"}, "Track", {"select": {"name": "DevOps"}}),
         ({"size": "XL"}, "Size", {"select": {"name": "XL"}}),
         ({"estimate": 5.0}, "Estimate", {"number": 5.0}),
         ({"start_date": "2026-11-26"}, "Start Date", {"date": {"start": "2026-11-26"}}),
@@ -419,7 +426,8 @@ def test_scheduled_sync_reflects_project_only_changes(github, notion, change, na
 
 def test_project_failure_preserves_existing_project_values(github, notion):
     github.add(make_issue(1))
-    github.set_project(1, status="In review", priority="P1")
+    github.set_project(1, status="In review")
+    github.set_meta(1, priority="P1")
     sync_all(github, notion)
 
     github.project_available = False
@@ -437,7 +445,8 @@ def test_unknown_status_is_reported_and_existing_status_kept(github, notion):
     github.set_project(1, status="Ready")
     sync_one(github, notion)
 
-    github.set_project(1, lookup=ProjectLookup.UNMAPPED, status="Blocked", priority="P0")
+    github.set_project(1, lookup=ProjectLookup.UNMAPPED, status="Blocked")
+    github.set_meta(1, priority="P0")
     report = sync_one(github, notion)
 
     assert prop(notion, "Project Status") == {"select": {"name": "Ready"}}
@@ -661,3 +670,51 @@ def test_dry_run_with_empty_allowlist_warns(monkeypatch, capsys):
 def test_project_number_rejects_non_ascii_digits():
     with pytest.raises(ConfigError, match="PROJECT_NUMBER"):
         load_settings(BASE_ENV | {"PROJECT_NUMBER": "\u00b2"}, dry_run=True)
+
+
+def test_F_059_AC_02_03_04_05_06_metadata_sync(github, notion):
+    github.add(make_issue(1))
+    github.set_meta(
+        1, priority="P1", issue_type="Task", parent=26,
+        sub_issues_total=2, sub_issues_completed=1, blocked_by=(43, 44),
+    )
+    assert outcome(sync_all(github, notion)) is SyncOutcome.CREATED
+    assert prop(notion, "Priority") == {"select": {"name": "P1"}}
+    assert plain(prop(notion, "Parent Issue")) == "#26"
+    assert plain(prop(notion, "Sub-issues Progress")) == "1/2"
+    assert plain(prop(notion, "Blocked By")) == "#43, #44"
+    assert outcome(sync_all(github, notion)) is SyncOutcome.UNCHANGED
+    github.meta_available = False
+    report = sync_all(github, notion)
+    assert report.exit_code() == 1
+    assert prop(notion, "Priority") == {"select": {"name": "P1"}}
+    assert prop(notion, "Issue Meta Sync State") == {"select": {"name": "error"}}
+    github.meta_available = True
+    github.set_meta(
+        1, priority=None, priority_known=False, parent=None,
+        sub_issues_total=0, sub_issues_completed=0, blocked_by=(),
+    )
+    sync_all(github, notion)
+    assert prop(notion, "Priority") == {"select": {"name": "P1"}}
+    assert plain(prop(notion, "Parent Issue")) == ""
+    del notion.schema["Issue Type"]
+    assert sync_all(github, notion).exit_code() == 0
+
+
+def test_F_059_AC_07_new_schema_backfills(github, notion):
+    github.add(make_issue(1))
+    del notion.schema["Parent Issue"]
+    github.set_meta(1, parent=26)
+    sync_all(github, notion)
+    notion.schema["Parent Issue"] = "rich_text"
+    assert outcome(sync_all(github, notion)) is SyncOutcome.UPDATED
+    assert plain(prop(notion, "Parent Issue")) == "#26"
+
+
+@pytest.mark.parametrize("priority", ["P0", "P1", "P2", None])
+def test_F_059_AC_01_04_priority_select_from_meta(priority):
+    from collaboration.github_client import IssueMeta
+
+    result = IssueMetaResult(IssueMetaLookup.OK, IssueMeta(priority=priority))
+    props = build_properties(make_issue(1), ProjectResult(ProjectLookup.ERROR), result)
+    assert props["Priority"] == {"select": {"name": priority} if priority else None}
